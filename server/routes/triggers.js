@@ -1,0 +1,153 @@
+import { Router } from 'express';
+import { supabase, unwrap } from '../lib/db.js';
+import { parsePrompt } from '../lib/llm.js';
+import { resolveSubject } from '../lib/domains/index.js';
+import { isValidCondition } from '../lib/domains/allowlist.js';
+
+const router = Router();
+
+router.post('/parse', async (req, res, next) => {
+  try {
+    const { raw_prompt } = req.body;
+    if (!raw_prompt || !raw_prompt.trim()) {
+      return res.status(400).json({ message: 'raw_prompt is required.' });
+    }
+
+    const parsed = await parsePrompt(raw_prompt.trim());
+    res.json(parsed);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/', async (req, res, next) => {
+  try {
+    const data = unwrap(
+      await supabase
+        .from('triggers')
+        .select('*')
+        .eq('user_id', req.user.id)
+        .order('created_at', { ascending: false }),
+    );
+    res.json(data);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/:id', async (req, res, next) => {
+  try {
+    const trigger = unwrap(
+      await supabase.from('triggers').select('*').eq('id', req.params.id).eq('user_id', req.user.id).single(),
+    );
+
+    const events = unwrap(
+      await supabase
+        .from('trigger_events')
+        .select('*')
+        .eq('trigger_id', req.params.id)
+        .order('fired_at', { ascending: false }),
+    );
+
+    res.json({ ...trigger, events });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/', async (req, res, next) => {
+  try {
+    const { raw_prompt, domain, subject, condition, channels, recurring } = req.body;
+
+    if (!raw_prompt || !domain) {
+      return res.status(400).json({ message: 'raw_prompt and domain are required.' });
+    }
+
+    if (domain === 'unsupported') {
+      const created = unwrap(
+        await supabase
+          .from('triggers')
+          .insert({
+            user_id: req.user.id,
+            raw_prompt,
+            domain: 'unsupported',
+            status: 'unsupported',
+            unsupported_reason: req.body.unsupported_reason || "This request isn't supported yet.",
+          })
+          .select()
+          .single(),
+      );
+      return res.status(201).json(created);
+    }
+
+    if (domain === 'gmail') {
+      const settings = unwrap(
+        await supabase.from('user_settings').select('gmail_oauth_refresh_token_encrypted').eq('user_id', req.user.id).maybeSingle(),
+      );
+      if (!settings?.gmail_oauth_refresh_token_encrypted) {
+        return res.status(400).json({ message: 'Connect Gmail access in Settings before creating a gmail trigger.' });
+      }
+    }
+
+    if (!isValidCondition(domain, condition)) {
+      return res.status(400).json({ message: 'Invalid condition for this domain.' });
+    }
+
+    const resolvedSubject = await resolveSubject(domain, subject);
+
+    const created = unwrap(
+      await supabase
+        .from('triggers')
+        .insert({
+          user_id: req.user.id,
+          raw_prompt,
+          domain,
+          subject: resolvedSubject,
+          condition,
+          channels: channels?.length ? channels : ['push'],
+          recurring: Boolean(recurring),
+          status: 'active',
+        })
+        .select()
+        .single(),
+    );
+
+    res.status(201).json(created);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch('/:id', async (req, res, next) => {
+  try {
+    const { status } = req.body;
+    if (!['active', 'paused'].includes(status)) {
+      return res.status(400).json({ message: 'status must be "active" or "paused".' });
+    }
+
+    const updated = unwrap(
+      await supabase
+        .from('triggers')
+        .update({ status })
+        .eq('id', req.params.id)
+        .eq('user_id', req.user.id)
+        .select()
+        .single(),
+    );
+
+    res.json(updated);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete('/:id', async (req, res, next) => {
+  try {
+    unwrap(await supabase.from('triggers').delete().eq('id', req.params.id).eq('user_id', req.user.id));
+    res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
+export default router;
