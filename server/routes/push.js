@@ -46,11 +46,27 @@ router.post('/test', async (req, res, next) => {
       return res.status(400).json({ message: "No push subscription found. Enable notifications first." });
     }
 
-    await Promise.all(
+    const results = await Promise.allSettled(
       subs.map((sub) =>
         sendPush(sub, { title: 'Trigger', body: "This is a test notification. You're all set." }),
       ),
     );
+
+    const deadEndpoints = subs
+      .filter((_, i) => {
+        const r = results[i];
+        return r.status === 'rejected' && [404, 410].includes(r.reason?.statusCode);
+      })
+      .map((sub) => sub.endpoint);
+
+    if (deadEndpoints.length) {
+      await supabase.from('push_subscriptions').delete().in('endpoint', deadEndpoints);
+    }
+
+    const delivered = results.filter((r) => r.status === 'fulfilled').length;
+    if (!delivered) {
+      return res.status(400).json({ message: 'Push subscription is no longer valid. Enable notifications again.' });
+    }
 
     res.json({ ok: true });
   } catch (error) {

@@ -2,9 +2,11 @@ import { Router } from 'express';
 import { supabase, unwrap } from '../lib/db.js';
 import { parsePrompt } from '../lib/llm.js';
 import { resolveSubject } from '../lib/domains/index.js';
-import { isValidCondition } from '../lib/domains/allowlist.js';
+import { isValidCondition, METRICS_BY_DOMAIN } from '../lib/domains/allowlist.js';
 
 const router = Router();
+
+const SUPPORTED_DOMAINS = Object.keys(METRICS_BY_DOMAIN);
 
 router.post('/parse', async (req, res, next) => {
   try {
@@ -14,6 +16,25 @@ router.post('/parse', async (req, res, next) => {
     }
 
     const parsed = await parsePrompt(raw_prompt.trim());
+
+    if (parsed.domain !== 'unsupported' && !SUPPORTED_DOMAINS.includes(parsed.domain)) {
+      return res.json({
+        domain: 'unsupported',
+        subject: {},
+        condition: {},
+        unsupported_reason: "This request isn't supported yet.",
+      });
+    }
+
+    if (parsed.domain !== 'unsupported' && !isValidCondition(parsed.domain, parsed.condition)) {
+      return res.json({
+        domain: 'unsupported',
+        subject: {},
+        condition: {},
+        unsupported_reason: "Couldn't determine a valid condition to watch for this request.",
+      });
+    }
+
     res.json(parsed);
   } catch (error) {
     next(error);

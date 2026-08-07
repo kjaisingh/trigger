@@ -5,13 +5,13 @@ const SYSTEM_PROMPT = `You turn a user's natural-language alert request into a s
 
 Supported domains and their subject shape:
 - weather: { "location": string } — a city/place name, e.g. "Boston, MA"
-- sports: { "team": string, "opponent"?: string } — team names as commonly known (club or national team)
+- sports: { "team": string, "opponent"?: string } — the full, canonical team name, not a nickname (e.g. "Los Angeles Lakers" not "Lakers", "Manchester United" not "Man U"; club or national team)
 - crypto: { "coin_id": string } — a CoinGecko coin id, e.g. "bitcoin", "ethereum", "dogecoin"
 
 Condition shape (same shape for every domain): { "metric": string, "operator": ">"|">="|"<"|"<="|"=="|"!=", "threshold": number|boolean, "edge_trigger": boolean }
 
 Allowed metrics per domain:
-- weather: temperature_f, precipitation_mm, wind_mph
+- weather: temperature_f, precipitation_mm, wind_mph, snowfall_cm (use snowfall_cm specifically for snow requests, precipitation_mm for rain/general precipitation)
 - sports: score_diff (team score minus opponent score), score_home, score_away
 - crypto: price_usd
 

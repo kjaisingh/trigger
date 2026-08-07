@@ -35,7 +35,7 @@ async function evaluateWeather(subject: any, condition: any) {
   const url = new URL('https://api.open-meteo.com/v1/forecast');
   url.searchParams.set('latitude', String(subject.lat));
   url.searchParams.set('longitude', String(subject.lon));
-  url.searchParams.set('current', 'temperature_2m,precipitation,wind_speed_10m');
+  url.searchParams.set('current', 'temperature_2m,precipitation,wind_speed_10m,snowfall');
   url.searchParams.set('temperature_unit', 'fahrenheit');
   url.searchParams.set('wind_speed_unit', 'mph');
 
@@ -47,6 +47,7 @@ async function evaluateWeather(subject: any, condition: any) {
     temperature_f: current.temperature_2m,
     precipitation_mm: current.precipitation,
     wind_mph: current.wind_speed_10m,
+    snowfall_cm: current.snowfall,
   };
 
   const value = valueByMetric[condition.metric];
@@ -57,7 +58,7 @@ async function fetchTeamEvents(teamId: string, endpoint: string) {
   const key = Deno.env.get('SPORTSDB_API_KEY') || '3';
   const res = await fetch(`https://www.thesportsdb.com/api/v1/json/${key}/${endpoint}.php?id=${teamId}`);
   const data = await res.json();
-  return data.events || [];
+  return data.events || data.results || [];
 }
 
 async function evaluateSports(subject: any, condition: any) {
@@ -134,11 +135,22 @@ async function evaluateTrigger(trigger: any) {
     const subs = await supabase.from('push_subscriptions').select('*').eq('user_id', trigger.user_id);
     const payload = { title: 'Trigger fired', body: `${trigger.raw_prompt} — ${result.description}` };
 
-    await Promise.allSettled(
+    const pushResults = await Promise.allSettled(
       (subs.data || []).map((sub: any) =>
         webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, JSON.stringify(payload)),
       ),
     );
+
+    const deadEndpoints = (subs.data || [])
+      .filter((_: any, i: number) => {
+        const r = pushResults[i];
+        return r.status === 'rejected' && [404, 410].includes(r.reason?.statusCode);
+      })
+      .map((sub: any) => sub.endpoint);
+
+    if (deadEndpoints.length) {
+      await supabase.from('push_subscriptions').delete().in('endpoint', deadEndpoints);
+    }
 
     await supabase.from('trigger_events').insert({
       trigger_id: trigger.id,

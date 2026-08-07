@@ -8,8 +8,8 @@ export default function LandingPage() {
     <div className="hero">
       <h1>Say it. We'll watch it.</h1>
       <p className="subtitle">
-        Describe what you're waiting for in plain English — weather, sports, crypto, or an email from
-        someone specific. Trigger watches it for you and pings you the moment it happens.
+        Describe what you're waiting for in plain English — weather, sports, or crypto prices.
+        Trigger watches it for you and pings you the moment it happens.
       </p>
       <Link to={user ? '/create' : '/auth'} className="button button-primary">
         {user ? 'Create a trigger' : 'Get started'}
@@ -19,7 +19,6 @@ export default function LandingPage() {
         <div className="card">"Let me know when the rain clears up in Boston"</div>
         <div className="card">"Tell me if the England vs Ghana score becomes tied"</div>
         <div className="card">"Alert me when Bitcoin drops below $50,000"</div>
-        <div className="card">"Ping me when my boss emails me"</div>
       </div>
     </div>
   );
