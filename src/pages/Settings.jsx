@@ -1,19 +1,15 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
-import { useAuth } from '../context/AuthContext.jsx';
 import { disablePush, enablePush, getPushSubscription, isPushSupported } from '../lib/push.js';
 
 export default function Settings() {
-  const { signInWithGoogle } = useAuth();
   const [pushSupported, setPushSupported] = useState(true);
   const [pushEnabled, setPushEnabled] = useState(false);
-  const [gmailConnected, setGmailConnected] = useState(false);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
     isPushSupported().then(setPushSupported);
     getPushSubscription().then((sub) => setPushEnabled(Boolean(sub)));
-    api.get('/api/settings').then((data) => setGmailConnected(data.gmail_connected));
   }, []);
 
   async function togglePush() {
@@ -34,11 +30,6 @@ export default function Settings() {
     } catch (err) {
       setMessage(err.message);
     }
-  }
-
-  async function disconnectGmail() {
-    await api.delete('/api/settings/gmail-connect');
-    setGmailConnected(false);
   }
 
   return (
@@ -65,22 +56,6 @@ export default function Settings() {
           <p className="empty-state">Push notifications aren't supported in this browser.</p>
         )}
         {message && <p>{message}</p>}
-      </div>
-
-      <div className="card stack">
-        <h3>Gmail</h3>
-        <div className="row row-between">
-          <span>{gmailConnected ? 'Connected' : 'Not connected'}</span>
-          {gmailConnected ? (
-            <button className="button button-danger" onClick={disconnectGmail}>
-              Disconnect
-            </button>
-          ) : (
-            <button className="button button-primary" onClick={signInWithGoogle}>
-              Connect Gmail
-            </button>
-          )}
-        </div>
       </div>
     </div>
   );

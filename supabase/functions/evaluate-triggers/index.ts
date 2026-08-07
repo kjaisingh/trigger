@@ -3,8 +3,6 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import webpush from 'npm:web-push@3.6.7';
-import crypto from 'node:crypto';
-import { Buffer } from 'node:buffer';
 
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
@@ -13,18 +11,6 @@ webpush.setVapidDetails(
   Deno.env.get('VAPID_PUBLIC_KEY')!,
   Deno.env.get('VAPID_PRIVATE_KEY')!,
 );
-
-const encryptionKey = Buffer.from(Deno.env.get('SETTINGS_ENCRYPTION_KEY') || '', 'base64');
-
-function decrypt(encoded: string) {
-  const raw = Buffer.from(encoded, 'base64');
-  const iv = raw.subarray(0, 12);
-  const authTag = raw.subarray(12, 28);
-  const ciphertext = raw.subarray(28);
-  const decipher = crypto.createDecipheriv('aes-256-gcm', encryptionKey, iv);
-  decipher.setAuthTag(authTag);
-  return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
-}
 
 function compare(value: number | boolean, operator: string, threshold: number | boolean) {
   switch (operator) {
@@ -129,48 +115,6 @@ async function evaluateCrypto(subject: any, condition: any) {
   return { value, description: `${subject.coinId} is at $${value}` };
 }
 
-async function evaluateGmail(trigger: any, subject: any) {
-  const settings = await supabase
-    .from('user_settings')
-    .select('gmail_oauth_refresh_token_encrypted')
-    .eq('user_id', trigger.user_id)
-    .maybeSingle();
-
-  const encrypted = settings.data?.gmail_oauth_refresh_token_encrypted;
-  if (!encrypted) {
-    return { value: false, description: 'Gmail is not connected.' };
-  }
-
-  const refreshToken = decrypt(encrypted);
-
-  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: Deno.env.get('GOOGLE_CLIENT_ID')!,
-      client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET')!,
-      refresh_token: refreshToken,
-      grant_type: 'refresh_token',
-    }),
-  });
-  const tokenData = await tokenRes.json();
-
-  const since = trigger.last_checked_at
-    ? Math.floor(new Date(trigger.last_checked_at).getTime() / 1000)
-    : Math.floor(new Date(trigger.created_at).getTime() / 1000);
-
-  const searchUrl = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages');
-  searchUrl.searchParams.set('q', `from:${subject.from} after:${since}`);
-
-  const messagesRes = await fetch(searchUrl, {
-    headers: { Authorization: `Bearer ${tokenData.access_token}` },
-  });
-  const messagesData = await messagesRes.json();
-  const found = Boolean(messagesData.messages?.length);
-
-  return { value: found, description: found ? `New message from ${subject.from}.` : `No new message from ${subject.from}.` };
-}
-
 async function evaluateTrigger(trigger: any) {
   const { domain, subject, condition } = trigger;
 
@@ -178,7 +122,6 @@ async function evaluateTrigger(trigger: any) {
   if (domain === 'weather') result = await evaluateWeather(subject, condition);
   else if (domain === 'sports') result = await evaluateSports(subject, condition);
   else if (domain === 'crypto') result = await evaluateCrypto(subject, condition);
-  else if (domain === 'gmail') result = await evaluateGmail(trigger, subject);
   else return;
 
   if (result.value === null || result.value === undefined) return;

@@ -80,15 +80,6 @@ router.post('/', async (req, res, next) => {
       return res.status(201).json(created);
     }
 
-    if (domain === 'gmail') {
-      const settings = unwrap(
-        await supabase.from('user_settings').select('gmail_oauth_refresh_token_encrypted').eq('user_id', req.user.id).maybeSingle(),
-      );
-      if (!settings?.gmail_oauth_refresh_token_encrypted) {
-        return res.status(400).json({ message: 'Connect Gmail access in Settings before creating a gmail trigger.' });
-      }
-    }
-
     if (!isValidCondition(domain, condition)) {
       return res.status(400).json({ message: 'Invalid condition for this domain.' });
     }

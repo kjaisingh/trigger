@@ -1,18 +1,18 @@
 # Trigger
-
 Tell it what you're waiting for, in plain English, and it alerts you the moment it happens.
 
 ## Overview
 
-Trigger turns a natural-language sentence — "let me know when the rain clears up in Boston", "keep me posted if the England vs Ghana score becomes tied", "tell me when I get an email from my landlord" — into a monitored condition. An LLM parses the prompt into a structured `{domain, subject, condition}`, a scheduled job polls the right data source on an interval, and a web push notification fires the moment the condition is met.
+Trigger turns a natural-language sentence — "let me know when the rain clears up in Boston", "keep me posted if the England vs Ghana score becomes tied", "tell me when bitcoin drops below $80k" — into a monitored condition. An LLM parses the prompt into a structured `{domain, subject, condition}`, a scheduled job polls the right data source on an interval, and a web push notification fires the moment the condition is met.
 
-Supported domains: weather (Open-Meteo), sports (TheSportsDB), crypto prices (CoinGecko), and Gmail (new message from a given sender, via the user's own Google sign-in).
+Supported domains: weather (Open-Meteo), sports (TheSportsDB), crypto prices (CoinGecko).
 
 Prompts that don't map to a supported domain are saved as `unsupported` with a plain-English reason, rather than force-fit into the nearest one.
 
 ## Feature Backlog
 
-- Generic web-crawling condition (BYOK LLM) for prompts outside the four built-in domains
+- Generic web-crawling condition (BYOK LLM) for prompts outside the three built-in domains
+- Gmail domain (new message from a given sender) — dropped from MVP to avoid the Google OAuth consent-screen setup and a token-encryption subsystem for a single domain
 - Email notification channel (nodemailer)
 - SMS via user-supplied Twilio key
 - Domain override as a first-class dropdown at creation time
@@ -22,7 +22,7 @@ Prompts that don't map to a supported domain are saved as `unsupported` with a p
 
 - **Frontend**: React + Vite, React Router
 - **Backend**: Node.js + Express, serving the built frontend and the API from a single Render web service
-- **Database / Auth**: Supabase (Postgres + Row Level Security, Supabase Auth with email/password and Google)
+- **Database / Auth**: Supabase (Postgres + Row Level Security, Supabase Auth with email/password)
 - **Scheduling**: Supabase `pg_cron` + `pg_net`, calling a Supabase Edge Function on a timer — no server-side cron needed
 - **LLM**: Groq (`llama-3.3-70b-versatile`) for one-time prompt parsing at trigger creation
 - **Notifications**: Web Push (VAPID), self-hosted, no vendor
@@ -34,8 +34,7 @@ Prompts that don't map to a supported domain are saved as `unsupported` with a p
 
 1. Create a new project at [supabase.com](https://supabase.com).
 2. In the SQL editor, run [`supabase/schema.sql`](supabase/schema.sql) to create the tables, RLS policies, and (commented-out) `pg_cron` job.
-3. Under Authentication → Providers, enable Google. In Google Cloud Console, add `https://www.googleapis.com/auth/gmail.readonly` as an available scope for the OAuth consent screen, and set the authorized redirect URI to the one Supabase shows on the Google provider config page.
-4. Grab the project URL, anon key, and service role key from Project Settings → API.
+3. Grab the project URL, anon key, and service role key from Project Settings → API.
 
 ### 2. Environment variables
 
@@ -44,8 +43,6 @@ Copy `.env.example` to `.env` and fill in:
 - `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` / `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` — from the Supabase project above
 - `GROQ_API_KEY` — free key from [console.groq.com](https://console.groq.com)
 - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VITE_VAPID_PUBLIC_KEY` — generate with `./node_modules/.bin/web-push generate-vapid-keys` after `npm install`
-- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — the same OAuth client registered in Supabase's Google provider config, needed server-side to refresh Gmail access tokens
-- `SETTINGS_ENCRYPTION_KEY` — 32-byte base64 key, generate with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`
 - `CRON_SHARED_SECRET` — any random string, shared between the Edge Function and the `pg_cron` job that calls it
 - `SPORTSDB_API_KEY` — free test key `3` works out of the box
 
@@ -55,8 +52,7 @@ Copy `.env.example` to `.env` and fill in:
 supabase functions deploy evaluate-triggers --project-ref <your-project-ref>
 supabase secrets set --project-ref <your-project-ref> \
   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... VAPID_SUBJECT=... \
-  VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... SETTINGS_ENCRYPTION_KEY=... \
-  GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=... CRON_SHARED_SECRET=... SPORTSDB_API_KEY=3
+  VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... CRON_SHARED_SECRET=... SPORTSDB_API_KEY=3
 ```
 
 Then uncomment and run the `cron.schedule(...)` block at the bottom of `schema.sql` (with the real project ref, service role key, and cron secret filled in) to start the 15-minute poll.
@@ -76,7 +72,7 @@ Connect this repo as a Render Blueprint (`render.yaml` is already configured):
 
 1. New → Blueprint on Render, point it at the `trigger` GitHub repo.
 2. Render creates one free web service. Fill in the `sync: false` environment variables in the dashboard (same values as your local `.env` — set `BASE_URL`/`CLIENT_URL`/`VITE_API_URL` to the deployed Render URL instead of localhost).
-3. `SETTINGS_ENCRYPTION_KEY` and `CRON_SHARED_SECRET` are auto-generated by Render if left blank — if you already deployed the Edge Function with your local values, paste those in instead so they match.
+3. `CRON_SHARED_SECRET` is auto-generated by Render if left blank — if you already deployed the Edge Function with your local value, paste that in instead so they match.
 
 ## Scripts
 

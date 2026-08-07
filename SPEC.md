@@ -9,7 +9,7 @@ Budget: $0/month. Public-facing portfolio demo. Build fast, LLM-assisted.
 - Frontend: React + Vite
 - Backend: Node + Express, single service, serves built frontend + on-demand CRUD API only (no longer runs the scheduler — see §2). Render free tier, fine for it to sleep between visits.
 - DB: Supabase Postgres (free tier)
-- Auth: Supabase Auth (email/password + Google OAuth)
+- Auth: Supabase Auth (email/password)
 - Hosting: Render free web service, on-demand only
 - LLM parsing: single app-default free key (**Groq**), no BYOK yet — BYOK deferred to the future generic-web-crawling feature (§10), not needed for the currently supported domains
 - Weather: Open-Meteo (no key, free geocoding+forecast)
@@ -49,7 +49,7 @@ triggers
   id uuid pk
   user_id uuid fk -> auth.users
   raw_prompt text
-  domain text              -- 'weather' | 'sports' | 'crypto' | 'gmail' | 'unsupported'
+  domain text              -- 'weather' | 'sports' | 'crypto' | 'unsupported'
   subject jsonb             -- domain-specific identity: {location, lat, lon} / {team_a, team_b, sport} / {coin_id} / {from_contains}
   condition jsonb           -- generalized DSL, see §5: { metric, operator, threshold, edge_trigger }
   channels text[]           -- ['push'] for now
@@ -73,10 +73,6 @@ push_subscriptions
   endpoint text
   keys jsonb
   created_at timestamptz
-
-user_settings
-  user_id uuid pk fk
-  gmail_oauth_refresh_token_encrypted text   -- only populated for Google-sign-in users
 ```
 
 RLS on all tables: `user_id = auth.uid()`.
@@ -85,7 +81,7 @@ RLS on all tables: `user_id = auth.uid()`.
 
 The whole point: "temp > 32°F in Boston" and "let me know when it stops raining" should both work, without hardcoding either phrasing. One LLM call, two jobs:
 
-**1. Domain routing.** Given the raw prompt, classify into `weather | sports | crypto | gmail | unsupported`. This is auto-routing, not a dropdown the user fills in first — they just type the sentence. The confirm screen (§8) shows the detected domain and lets them override it if the LLM guessed wrong, rather than forcing a manual pre-selection every time.
+**1. Domain routing.** Given the raw prompt, classify into `weather | sports | crypto | unsupported`. This is auto-routing, not a dropdown the user fills in first — they just type the sentence. The confirm screen (§8) shows the detected domain and lets them override it if the LLM guessed wrong, rather than forcing a manual pre-selection every time.
 
 **2. Condition extraction into a generalized DSL**, same shape regardless of domain:
 ```json
@@ -106,8 +102,6 @@ Evaluation itself (comparing fetched value against `{metric, operator, threshold
 
 **crypto** — CoinGecko. `subject.coin_id` (e.g. `bitcoin`), compare `price_usd` to `condition`. Genuinely trivial to add given the same DSL — good first domain to bolt on after weather/sports are working, since there's no new architecture involved, just a new fetch adapter.
 
-**gmail** — poll `users.messages.list` filtered by `subject.from_contains`/`subject_contains`, since `last_checked_at`. Auth piggybacks on Supabase's Google sign-in: request `gmail.readonly` as an extra scope on `signInWithOAuth`, store the returned refresh token encrypted. Only available to users who signed in with Google — UI hides this domain option otherwise rather than failing at creation time.
-
 ## 6. Notification channels
 
 **MVP: Web Push only.** VAPID keypair, self-hosted, zero vendor, zero cost. Covers desktop Chrome/Firefox/Edge and Android fully; iOS only if the user's added the site to their home screen as a PWA (2024+ Safari behavior) — worth one line of UI copy so it doesn't read as broken.
@@ -116,7 +110,7 @@ Evaluation itself (comparing fetched value against `{metric, operator, threshold
 
 ## 7. Core features & user flows
 
-1. **Sign up / sign in** — Supabase Auth, email/password or Google. Google path additionally grants `gmail.readonly` up front so the gmail domain is available without a second consent screen later.
+1. **Sign up / sign in** — Supabase Auth, email/password.
 2. **Create a trigger** — type a plain-English sentence → `/api/triggers/parse` → LLM returns `{domain, subject, condition, suggested_channels}` → shown back as an editable, human-readable confirmation ("Watching: temperature in Boston, MA. Fires when: above 32°F.") → user can tweak domain/fields or just confirm → saved `active`.
 3. **Grant push permission** — prompted once, subscription stored.
 4. **Background evaluation** — invisible to the user; Supabase-side loop (§2) does the work.
@@ -131,7 +125,7 @@ Evaluation itself (comparing fetched value against `{metric, operator, threshold
 - **Dashboard** — list of triggers, status badges (active/fired/paused/unsupported/error), create button
 - **Create trigger** — NL input box → confirmation/edit card (domain override dropdown, condition fields, channel checkboxes)
 - **Trigger detail** — the parsed condition, last-checked time, fire history (`trigger_events`)
-- **Settings** — push subscription management, connected-Google/Gmail-scope status
+- **Settings** — push subscription management
 
 ## 9. Known limitations (state plainly, don't hide)
 
@@ -139,12 +133,12 @@ Evaluation itself (comparing fetched value against `{metric, operator, threshold
 - Web push doesn't reach iOS Safari unless added to home screen as a PWA.
 - Free LLM tier (Groq) can change quota with no notice — parse endpoint should fail to a clear "try again shortly" rather than hang.
 - TheSportsDB's free test key has rate limits tighter than a paid key — fine at the chosen poll interval, would need attention if interval were tightened later.
-- Gmail domain only available to Google-sign-in users, by construction (§5).
 - No RLS bypass anywhere except the Edge Function's service-role usage, same pattern as hivemind's backend already uses.
 
 ## 10. Stretch / backlog
 
-- **Generic web-crawling condition** — for prompts that don't fit weather/sports/crypto/gmail (e.g. "tell me when this product restocks", "when my flight status changes"). This is where **BYOK** (OpenAI/Anthropic/Google/Groq/OpenRouter, one normalized interface) actually earns its place — a crawl-and-judge loop calling an LLM on every poll tick is exactly the kind of usage that would blow past a shared app-default free-tier key, so it's gated behind the user's own key rather than the app's.
+- **Generic web-crawling condition** — for prompts that don't fit weather/sports/crypto (e.g. "tell me when this product restocks", "when my flight status changes"). This is where **BYOK** (OpenAI/Anthropic/Google/Groq/OpenRouter, one normalized interface) actually earns its place — a crawl-and-judge loop calling an LLM on every poll tick is exactly the kind of usage that would blow past a shared app-default free-tier key, so it's gated behind the user's own key rather than the app's.
+- **Gmail domain** (new message from a given sender) — dropped from MVP scope to avoid the Google OAuth consent-screen setup and a token-encryption subsystem for a single domain; revisit if there's real demand.
 - Email notification channel (nodemailer)
 - SMS via user-supplied Twilio key (BYOK-style, off by default)
 - Manual domain override made a first-class dropdown at creation time (right now it's an edit-after-the-fact affordance on the confirm screen)
@@ -152,9 +146,9 @@ Evaluation itself (comparing fetched value against `{metric, operator, threshold
 
 ## 11. Decisions (resolved)
 
-- Auth: **Supabase Auth**.
+- Auth: **Supabase Auth**, email/password only.
 - App-default LLM: **Groq**, single key, no BYOK until the generic web-crawling feature.
-- Gmail domain: **in MVP**, gated to Google-sign-in users.
+- Gmail domain: **dropped from MVP** — simplifies auth to plain email/password and removes the token-encryption subsystem; backlogged (§10).
 - Scheduler: **Supabase pg_cron + pg_net → Edge Function**, not Render/GitHub Actions — Render fully decoupled from polling.
 - Notification channels: **web push only** for MVP; email and SMS backlogged.
 - Sports: **TheSportsDB**, multi-sport, not soccer-only.

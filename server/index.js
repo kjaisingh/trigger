@@ -7,7 +7,6 @@ import cors from 'cors';
 import { requireAuth } from './lib/auth.js';
 import triggerRoutes from './routes/triggers.js';
 import pushRoutes from './routes/push.js';
-import settingsRoutes from './routes/settings.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -17,7 +16,6 @@ app.use(express.json());
 
 app.use('/api/triggers', requireAuth, triggerRoutes);
 app.use('/api/push', requireAuth, pushRoutes);
-app.use('/api/settings', requireAuth, settingsRoutes);
 
 const distPath = path.join(__dirname, '..', 'dist');
 app.use(express.static(distPath));

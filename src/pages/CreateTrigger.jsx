@@ -44,10 +44,7 @@ export default function CreateTrigger() {
     setParsed({
       domain,
       subject: {},
-      condition:
-        domain === 'gmail'
-          ? { metric: 'message_received', operator: '==', threshold: true, edge_trigger: true }
-          : { metric: METRICS_BY_DOMAIN[domain]?.[0], operator: '>', threshold: 0, edge_trigger: false },
+      condition: { metric: METRICS_BY_DOMAIN[domain]?.[0], operator: '>', threshold: 0, edge_trigger: false },
       unsupported_reason: null,
     });
   }
@@ -92,7 +89,6 @@ export default function CreateTrigger() {
               <option value="weather">Weather</option>
               <option value="sports">Sports</option>
               <option value="crypto">Crypto</option>
-              <option value="gmail">Gmail</option>
               <option value="unsupported">Unsupported</option>
             </select>
           </div>
@@ -132,54 +128,42 @@ export default function CreateTrigger() {
                 />
               )}
 
-              {parsed.domain === 'gmail' && (
+              <div className="row condition-row">
+                <select
+                  value={parsed.condition.metric}
+                  onChange={(e) => updateConditionField('metric', e.target.value)}
+                >
+                  {METRICS_BY_DOMAIN[parsed.domain]?.map((metric) => (
+                    <option key={metric} value={metric}>
+                      {metric}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={parsed.condition.operator}
+                  onChange={(e) => updateConditionField('operator', e.target.value)}
+                >
+                  {OPERATORS.map((op) => (
+                    <option key={op} value={op}>
+                      {op}
+                    </option>
+                  ))}
+                </select>
                 <input
-                  placeholder="Sender name or email"
-                  value={parsed.subject.from || ''}
-                  onChange={(e) => updateSubjectField('from', e.target.value)}
+                  type="number"
+                  value={parsed.condition.threshold}
+                  onChange={(e) => updateConditionField('threshold', Number(e.target.value))}
                 />
-              )}
+              </div>
 
-              {parsed.domain !== 'gmail' && (
-                <div className="row condition-row">
-                  <select
-                    value={parsed.condition.metric}
-                    onChange={(e) => updateConditionField('metric', e.target.value)}
-                  >
-                    {METRICS_BY_DOMAIN[parsed.domain]?.map((metric) => (
-                      <option key={metric} value={metric}>
-                        {metric}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={parsed.condition.operator}
-                    onChange={(e) => updateConditionField('operator', e.target.value)}
-                  >
-                    {OPERATORS.map((op) => (
-                      <option key={op} value={op}>
-                        {op}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    type="number"
-                    value={parsed.condition.threshold}
-                    onChange={(e) => updateConditionField('threshold', Number(e.target.value))}
-                  />
-                </div>
-              )}
-
-              {parsed.domain !== 'gmail' && (
-                <label className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={parsed.condition.edge_trigger}
-                    onChange={(e) => updateConditionField('edge_trigger', e.target.checked)}
-                  />
-                  Only alert on the transition (e.g. "stops raining"), not every check
-                </label>
-              )}
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={parsed.condition.edge_trigger}
+                  onChange={(e) => updateConditionField('edge_trigger', e.target.checked)}
+                />
+                Only alert on the transition (e.g. "stops raining"), not every check
+              </label>
 
               <label className="checkbox-row">
                 <input type="checkbox" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} />

@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient.js';
-import { api } from '../lib/api.js';
 
 const AuthContext = createContext(null);
 
@@ -14,12 +13,8 @@ export function AuthProvider({ children }) {
       setLoading(false);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
-
-      if (event === 'SIGNED_IN' && newSession?.provider_refresh_token) {
-        api.post('/api/settings/gmail-connect', { refresh_token: newSession.provider_refresh_token }).catch(() => {});
-      }
     });
 
     return () => listener.subscription.unsubscribe();
@@ -31,14 +26,6 @@ export function AuthProvider({ children }) {
     loading,
     signUp: (email, password) => supabase.auth.signUp({ email, password }),
     signIn: (email, password) => supabase.auth.signInWithPassword({ email, password }),
-    signInWithGoogle: () =>
-      supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          scopes: 'https://www.googleapis.com/auth/gmail.readonly',
-          queryParams: { access_type: 'offline', prompt: 'consent' },
-        },
-      }),
     signOut: () => supabase.auth.signOut(),
   };
 

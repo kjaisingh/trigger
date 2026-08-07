@@ -3,7 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 
 export default function AuthPage() {
-  const { user, signIn, signUp, signInWithGoogle } = useAuth();
+  const { user, signIn, signUp } = useAuth();
   const navigate = useNavigate();
   const [mode, setMode] = useState('signin');
   const [email, setEmail] = useState('');
@@ -54,10 +54,6 @@ export default function AuthPage() {
             {mode === 'signin' ? 'Sign in' : 'Sign up'}
           </button>
         </form>
-
-        <button className="button button-google" onClick={signInWithGoogle}>
-          Continue with Google
-        </button>
 
         <button className="link-button" onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}>
           {mode === 'signin' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}

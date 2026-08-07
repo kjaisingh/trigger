@@ -139,10 +139,6 @@ h3 {
   background: rgba(255, 91, 110, 0.1);
 }
 
-.button-google {
-  border-color: var(--border);
-}
-
 .link-button {
   background: none;
   border: none;

@@ -35,11 +35,5 @@ services:
         sync: false
       - key: SPORTSDB_API_KEY
         value: 3
-      - key: SETTINGS_ENCRYPTION_KEY
-        generateValue: true
-      - key: GOOGLE_CLIENT_ID
-        sync: false
-      - key: GOOGLE_CLIENT_SECRET
-        sync: false
       - key: CRON_SHARED_SECRET
         generateValue: true

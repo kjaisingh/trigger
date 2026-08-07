@@ -8,7 +8,7 @@ create table if not exists triggers (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   raw_prompt text not null,
-  domain text not null check (domain in ('weather', 'sports', 'crypto', 'gmail', 'unsupported')),
+  domain text not null check (domain in ('weather', 'sports', 'crypto', 'unsupported')),
   subject jsonb not null default '{}'::jsonb,
   condition jsonb not null default '{}'::jsonb,
   channels text[] not null default array['push'],
@@ -37,12 +37,6 @@ create table if not exists push_subscriptions (
   created_at timestamptz not null default now()
 );
 
-create table if not exists user_settings (
-  user_id uuid primary key references auth.users(id) on delete cascade,
-  gmail_oauth_refresh_token_encrypted text,
-  updated_at timestamptz not null default now()
-);
-
 create index if not exists triggers_user_id_idx on triggers(user_id);
 create index if not exists triggers_status_idx on triggers(status);
 create index if not exists trigger_events_trigger_id_idx on trigger_events(trigger_id);
@@ -51,7 +45,6 @@ create index if not exists push_subscriptions_user_id_idx on push_subscriptions(
 alter table triggers enable row level security;
 alter table trigger_events enable row level security;
 alter table push_subscriptions enable row level security;
-alter table user_settings enable row level security;
 
 create policy "triggers_owner_all" on triggers
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
@@ -62,9 +55,6 @@ create policy "trigger_events_owner_select" on trigger_events
   ));
 
 create policy "push_subscriptions_owner_all" on push_subscriptions
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-
-create policy "user_settings_owner_all" on user_settings
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- After deploying the evaluate-triggers Edge Function, schedule it from Postgres itself.

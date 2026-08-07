@@ -2,7 +2,6 @@ export const METRICS_BY_DOMAIN = {
   weather: ['temperature_f', 'precipitation_mm', 'wind_mph'],
   sports: ['score_diff', 'score_home', 'score_away'],
   crypto: ['price_usd'],
-  gmail: ['message_received'],
 };
 
 export const OPERATORS = ['>', '>=', '<', '<=', '==', '!='];
