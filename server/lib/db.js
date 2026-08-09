@@ -6,7 +6,9 @@ export const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPAB
 
 export function unwrap({ data, error }) {
   if (error) {
-    throw new Error(error.message);
+    const err = new Error(error.message);
+    err.code = error.code;
+    throw err;
   }
   return data;
 }

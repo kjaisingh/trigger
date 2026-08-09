@@ -8,8 +8,12 @@ export default function Settings() {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    isPushSupported().then(setPushSupported);
-    getPushSubscription().then((sub) => setPushEnabled(Boolean(sub)));
+    isPushSupported().then((supported) => {
+      setPushSupported(supported);
+      if (supported) {
+        getPushSubscription().then((sub) => setPushEnabled(Boolean(sub)));
+      }
+    });
   }, []);
 
   async function togglePush() {

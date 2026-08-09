@@ -8,15 +8,20 @@ export default function TriggerDetail() {
   const navigate = useNavigate();
   const [trigger, setTrigger] = useState(null);
   const [events, setEvents] = useState([]);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    api.get(`/api/triggers/${id}`).then(({ events, ...trigger }) => {
-      setTrigger(trigger);
-      setEvents(events);
-    });
+    api
+      .get(`/api/triggers/${id}`)
+      .then(({ events, ...trigger }) => {
+        setTrigger(trigger);
+        setEvents(events);
+      })
+      .catch((err) => setError(err.message));
   }, [id]);
 
-  if (!trigger) return null;
+  if (error) return <p className="empty-state">Couldn't load this trigger: {error}</p>;
+  if (!trigger) return <p className="empty-state">Loading...</p>;
 
   async function toggleStatus() {
     const status = trigger.status === 'paused' ? 'active' : 'paused';
@@ -44,10 +49,16 @@ export default function TriggerDetail() {
           <span>{trigger.domain}</span>
         </div>
         <div className="row">
-          <span className="label">Condition</span>
+          <span className="label">{trigger.domain === 'unsupported' ? 'Why' : 'Condition'}</span>
           <span>
-            {trigger.condition.metric} {trigger.condition.operator} {String(trigger.condition.threshold)}
-            {trigger.condition.edge_trigger ? ' (on transition)' : ''}
+            {trigger.domain === 'unsupported' ? (
+              trigger.unsupported_reason
+            ) : (
+              <>
+                {trigger.condition.metric} {trigger.condition.operator} {String(trigger.condition.threshold)}
+                {trigger.condition.edge_trigger ? ' (on transition)' : ''}
+              </>
+            )}
           </span>
         </div>
         <div className="row">

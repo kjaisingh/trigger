@@ -72,6 +72,9 @@ router.get('/:id', async (req, res, next) => {
 
     res.json({ ...trigger, events });
   } catch (error) {
+    if (error.code === 'PGRST116') {
+      return res.status(404).json({ message: 'Trigger not found.' });
+    }
     next(error);
   }
 });
@@ -149,6 +152,9 @@ router.patch('/:id', async (req, res, next) => {
 
     res.json(updated);
   } catch (error) {
+    if (error.code === 'PGRST116') {
+      return res.status(404).json({ message: 'Trigger not found.' });
+    }
     next(error);
   }
 });

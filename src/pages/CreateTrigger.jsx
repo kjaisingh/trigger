@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
 
 const METRICS_BY_DOMAIN = {
-  weather: ['temperature_f', 'precipitation_mm', 'wind_mph'],
+  weather: ['temperature_f', 'precipitation_mm', 'wind_mph', 'snowfall_cm'],
   sports: ['score_diff', 'score_home', 'score_away'],
   crypto: ['price_usd'],
 };

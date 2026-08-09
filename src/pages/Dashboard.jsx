@@ -5,12 +5,11 @@ import TriggerCard from '../components/TriggerCard.jsx';
 
 export default function Dashboard() {
   const [triggers, setTriggers] = useState(null);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    api.get('/api/triggers').then(setTriggers);
+    api.get('/api/triggers').then(setTriggers).catch((err) => setError(err.message));
   }, []);
-
-  if (!triggers) return null;
 
   return (
     <div className="stack">
@@ -21,7 +20,11 @@ export default function Dashboard() {
         </Link>
       </div>
 
-      {triggers.length === 0 ? (
+      {error ? (
+        <p className="empty-state">Couldn't load your triggers: {error}</p>
+      ) : !triggers ? (
+        <p className="empty-state">Loading...</p>
+      ) : triggers.length === 0 ? (
         <p className="empty-state">No triggers yet. Create one to get started.</p>
       ) : (
         <div className="trigger-grid">
