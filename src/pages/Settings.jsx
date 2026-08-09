@@ -30,7 +30,7 @@ export default function Settings() {
       }
     } catch (err) {
       setMessage(
-        err.name === 'NotAllowedError'
+        err.name === 'NotAllowedError' || err.name === 'AbortError'
           ? "Notifications are blocked for this site. Allow them in your browser's site settings and try again."
           : err.message || "Couldn't update push notifications.",
       );

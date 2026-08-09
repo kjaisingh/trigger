@@ -316,7 +316,7 @@ textarea:focus {
 /* Create trigger */
 
 .confirm-card select,
-.confirm-card input {
+.confirm-card input:not([type='checkbox']) {
   width: 100%;
 }
 
