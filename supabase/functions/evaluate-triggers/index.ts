@@ -123,10 +123,21 @@ async function evaluateTrigger(trigger: any) {
   const { domain, subject, condition } = trigger;
 
   let result;
-  if (domain === 'weather') result = await evaluateWeather(subject, condition);
-  else if (domain === 'sports') result = await evaluateSports(subject, condition);
-  else if (domain === 'crypto') result = await evaluateCrypto(subject, condition);
-  else return;
+  try {
+    if (domain === 'weather') result = await evaluateWeather(subject, condition);
+    else if (domain === 'sports') result = await evaluateSports(subject, condition);
+    else if (domain === 'crypto') result = await evaluateCrypto(subject, condition);
+    else return;
+  } catch (err) {
+    await supabase
+      .from('triggers')
+      .update({
+        last_checked_at: new Date().toISOString(),
+        last_state: { ...(trigger.last_state || {}), error: err.message },
+      })
+      .eq('id', trigger.id);
+    throw err;
+  }
 
   if (result.value === null || result.value === undefined) return;
 

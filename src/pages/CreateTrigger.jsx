@@ -169,12 +169,12 @@ export default function CreateTrigger() {
                 <input type="checkbox" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} />
                 Keep alerting every time this happens (recurring)
               </label>
-
-              <button className="button button-primary" onClick={handleCreate} disabled={loading}>
-                Create trigger
-              </button>
             </>
           )}
+
+          <button className="button button-primary" onClick={handleCreate} disabled={loading}>
+            {parsed.domain === 'unsupported' ? 'Save anyway' : 'Create trigger'}
+          </button>
         </div>
       )}
     </div>

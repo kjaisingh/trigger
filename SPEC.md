@@ -133,6 +133,7 @@ Evaluation itself (comparing fetched value against `{metric, operator, threshold
 - Web push doesn't reach iOS Safari unless added to home screen as a PWA.
 - Free LLM tier (Groq) can change quota with no notice — parse endpoint should fail to a clear "try again shortly" rather than hang.
 - TheSportsDB's free test key has rate limits tighter than a paid key — fine at the chosen poll interval, would need attention if interval were tightened later.
+- CoinGecko's free API rate-limits by IP, and Render's free-tier shared outbound IP can trip it in practice (observed 429s in production testing) — a crypto trigger's checks will intermittently fail under this, surfaced via the `last_state.error` field and the "⚠ check failing" UI badge rather than failing silently; it self-clears once a poll succeeds.
 - No RLS bypass anywhere except the Edge Function's service-role usage, same pattern as hivemind's backend already uses.
 
 ## 10. Stretch / backlog

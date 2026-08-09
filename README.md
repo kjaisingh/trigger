@@ -9,6 +9,13 @@ Supported domains: weather (Open-Meteo), sports (TheSportsDB), crypto prices (Co
 
 Prompts that don't map to a supported domain are saved as `unsupported` with a plain-English reason, rather than force-fit into the nearest one.
 
+## Known Limitations
+
+- **Polling is coarse, not real-time.** Alerts land within the poll window (every 15 minutes by default), not the instant the condition becomes true.
+- **iOS push needs a home-screen install.** Safari only delivers web push to sites added to the home screen (Share → Add to Home Screen), not to a normal Safari tab.
+- **Third-party APIs are free-tier and can rate-limit.** Open-Meteo, TheSportsDB, and CoinGecko are all called with no key or a shared free key. If a check starts failing (e.g. a 429 from a rate limit), the trigger shows a "⚠ check failing" badge on its dashboard card and the specific error on its detail page — this clears on its own once a poll succeeds again, no action needed.
+- **Email confirmation depends on your Supabase Auth settings.** If "Confirm email" is enabled on the project, signing up won't sign the user in immediately — they'll see a message to check their inbox first.
+
 ## Feature Backlog
 
 - Generic web-crawling condition (BYOK LLM) for prompts outside the three built-in domains

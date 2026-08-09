@@ -71,6 +71,12 @@ export default function TriggerDetail() {
             <span>{new Date(trigger.last_checked_at).toLocaleString()}</span>
           </div>
         )}
+        {trigger.last_state?.error && (
+          <div className="row">
+            <span className="label">Last check</span>
+            <span className="warn-text">Failed — {trigger.last_state.error}</span>
+          </div>
+        )}
       </div>
 
       {canToggle && (

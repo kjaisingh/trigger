@@ -11,18 +11,29 @@ export default function Settings() {
     isPushSupported().then((supported) => {
       setPushSupported(supported);
       if (supported) {
-        getPushSubscription().then((sub) => setPushEnabled(Boolean(sub)));
+        getPushSubscription()
+          .then((sub) => setPushEnabled(Boolean(sub)))
+          .catch(() => setPushEnabled(false));
       }
     });
   }, []);
 
   async function togglePush() {
-    if (pushEnabled) {
-      await disablePush();
-      setPushEnabled(false);
-    } else {
-      await enablePush();
-      setPushEnabled(true);
+    setMessage('');
+    try {
+      if (pushEnabled) {
+        await disablePush();
+        setPushEnabled(false);
+      } else {
+        await enablePush();
+        setPushEnabled(true);
+      }
+    } catch (err) {
+      setMessage(
+        err.name === 'NotAllowedError'
+          ? "Notifications are blocked for this site. Allow them in your browser's site settings and try again."
+          : err.message || "Couldn't update push notifications.",
+      );
     }
   }
 

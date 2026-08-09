@@ -7,6 +7,7 @@
   --accent: #5b8cff;
   --accent-hover: #7ba1ff;
   --danger: #ff5b6e;
+  --warning: #e0a83e;
   --radius: 10px;
   color-scheme: dark;
 }
@@ -183,6 +184,12 @@ textarea:focus {
   margin: 0;
 }
 
+.warn-text {
+  color: var(--warning);
+  margin: 0;
+  font-size: 0.85rem;
+}
+
 .empty-state {
   color: var(--text-muted);
 }
@@ -252,7 +259,11 @@ textarea:focus {
 .trigger-card-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
+}
+
+.trigger-card-header .domain-tag {
+  margin-right: auto;
 }
 
 .domain-tag {

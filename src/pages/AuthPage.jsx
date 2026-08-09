@@ -9,6 +9,7 @@ export default function AuthPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   if (user) return <Navigate to="/dashboard" replace />;
@@ -16,15 +17,23 @@ export default function AuthPage() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
+    setInfo('');
     setSubmitting(true);
 
-    const { error } = mode === 'signin' ? await signIn(email, password) : await signUp(email, password);
+    const { data, error } = mode === 'signin' ? await signIn(email, password) : await signUp(email, password);
 
     setSubmitting(false);
     if (error) {
       setError(error.message);
       return;
     }
+
+    if (mode === 'signup' && !data.session) {
+      setInfo("Check your email to confirm your account, then sign in.");
+      setMode('signin');
+      return;
+    }
+
     navigate('/dashboard');
   }
 
@@ -49,13 +58,21 @@ export default function AuthPage() {
             required
             minLength={6}
           />
+          {info && <p>{info}</p>}
           {error && <p className="error-text">{error}</p>}
           <button type="submit" className="button button-primary" disabled={submitting}>
             {mode === 'signin' ? 'Sign in' : 'Sign up'}
           </button>
         </form>
 
-        <button className="link-button" onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}>
+        <button
+          className="link-button"
+          onClick={() => {
+            setError('');
+            setInfo('');
+            setMode(mode === 'signin' ? 'signup' : 'signin');
+          }}
+        >
           {mode === 'signin' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
         </button>
       </div>
