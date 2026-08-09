@@ -11,6 +11,9 @@ export async function resolveSubject(subject) {
   url.searchParams.set('vs_currencies', 'usd');
 
   const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`CoinGecko lookup failed (${res.status}). Try again in a moment.`);
+  }
   const data = await res.json();
 
   if (!data[coinId]) {

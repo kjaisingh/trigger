@@ -5,6 +5,9 @@ async function searchTeam(name) {
   url.searchParams.set('t', name);
 
   const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`TheSportsDB lookup failed (${res.status}). Try again in a moment.`);
+  }
   const data = await res.json();
   const match = data.teams?.[0];
 

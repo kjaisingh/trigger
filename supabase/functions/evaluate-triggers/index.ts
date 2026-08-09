@@ -40,6 +40,7 @@ async function evaluateWeather(subject: any, condition: any) {
   url.searchParams.set('wind_speed_unit', 'mph');
 
   const res = await fetch(url);
+  if (!res.ok) throw new Error(`Open-Meteo lookup failed (${res.status})`);
   const data = await res.json();
   const current = data.current;
 
@@ -57,6 +58,7 @@ async function evaluateWeather(subject: any, condition: any) {
 async function fetchTeamEvents(teamId: string, endpoint: string) {
   const key = Deno.env.get('SPORTSDB_API_KEY') || '3';
   const res = await fetch(`https://www.thesportsdb.com/api/v1/json/${key}/${endpoint}.php?id=${teamId}`);
+  if (!res.ok) throw new Error(`TheSportsDB lookup failed (${res.status})`);
   const data = await res.json();
   return data.events || data.results || [];
 }
@@ -110,6 +112,7 @@ async function evaluateCrypto(subject: any, condition: any) {
   url.searchParams.set('vs_currencies', 'usd');
 
   const res = await fetch(url);
+  if (!res.ok) throw new Error(`CoinGecko lookup failed (${res.status})`);
   const data = await res.json();
   const value = data[subject.coinId]?.usd;
 

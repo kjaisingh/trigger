@@ -11,6 +11,9 @@ export async function resolveSubject(subject) {
   url.searchParams.set('count', '1');
 
   const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Weather lookup failed (${res.status}). Try again in a moment.`);
+  }
   const data = await res.json();
   const match = data.results?.[0];
 
