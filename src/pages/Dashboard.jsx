@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import TriggerCard from '../components/TriggerCard.jsx';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
+import { enablePush, isPushSupported } from '../lib/push.js';
 
 export default function Dashboard() {
   useDocumentTitle('Dashboard');
@@ -14,6 +15,14 @@ export default function Dashboard() {
       .get('/api/triggers')
       .then(setTriggers)
       .catch((err) => setError(err.message));
+  }, []);
+
+  useEffect(() => {
+    isPushSupported().then((supported) => {
+      if (supported && Notification.permission === 'default') {
+        enablePush().catch(() => {});
+      }
+    });
   }, []);
 
   return (

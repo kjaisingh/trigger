@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import StatusBadge from './StatusBadge.jsx';
+import { summarizeTrigger } from '../lib/summarize.js';
 
 export default function TriggerCard({ trigger }) {
   return (
@@ -13,7 +14,7 @@ export default function TriggerCard({ trigger }) {
           </span>
         )}
       </div>
-      <p className="trigger-prompt">{trigger.raw_prompt}</p>
+      <p className="trigger-prompt">{summarizeTrigger(trigger)}</p>
       <span className="trigger-date">{new Date(trigger.created_at).toLocaleString()}</span>
     </Link>
   );

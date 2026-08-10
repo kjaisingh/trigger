@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
+import { describeCondition } from '../lib/summarize.js';
 
 export default function TriggerDetail() {
   const { id } = useParams();
@@ -73,15 +74,9 @@ export default function TriggerDetail() {
         <div className="row">
           <span className="label">{trigger.domain === 'unsupported' ? 'Why' : 'Condition'}</span>
           <span>
-            {trigger.domain === 'unsupported' ? (
-              trigger.unsupported_reason
-            ) : (
-              <>
-                {trigger.condition.metric} {trigger.condition.operator}{' '}
-                {String(trigger.condition.threshold)}
-                {trigger.condition.edge_trigger ? ' (on transition)' : ''}
-              </>
-            )}
+            {trigger.domain === 'unsupported'
+              ? trigger.unsupported_reason
+              : describeCondition(trigger.condition)}
           </span>
         </div>
         <div className="row">
@@ -97,7 +92,7 @@ export default function TriggerDetail() {
         {trigger.last_state?.error && (
           <div className="row">
             <span className="label">Last check</span>
-            <span className="warn-text">Failed — {trigger.last_state.error}</span>
+            <span className="warn-text">Failed - {trigger.last_state.error}</span>
           </div>
         )}
       </div>

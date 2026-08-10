@@ -2,28 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
-import {
-  METRIC_LABELS,
-  METRICS_BY_DOMAIN,
-  OPERATOR_LABELS,
-  OPERATORS,
-} from '../../shared/domains.js';
-
-function describeSubject(domain, subject) {
-  if (domain === 'weather') return subject.location || 'your location';
-  if (domain === 'sports')
-    return subject.opponent
-      ? `${subject.team} vs ${subject.opponent}`
-      : subject.team || 'your team';
-  if (domain === 'crypto') return subject.coin_id || 'your coin';
-  return '';
-}
-
-function describeCondition(condition) {
-  const metric = METRIC_LABELS[condition.metric] || condition.metric;
-  const operator = OPERATOR_LABELS[condition.operator] || condition.operator;
-  return `${metric} ${operator} ${condition.threshold}${condition.edge_trigger ? ', on transition only' : ''}`;
-}
+import { METRIC_LABELS, METRICS_BY_DOMAIN, OPERATOR_LABELS, OPERATORS } from '../../shared/domains.js';
+import { describeSubject, describeCondition } from '../lib/summarize.js';
 
 export default function CreateTrigger() {
   useDocumentTitle('New trigger');
@@ -125,10 +105,14 @@ export default function CreateTrigger() {
             </p>
           ) : (
             <>
-              <p className="subtitle-muted">
-                Watching: {describeSubject(parsed.domain, parsed.subject)}. Fires when:{' '}
-                {describeCondition(parsed.condition)}.
-              </p>
+              <div className="row">
+                <span className="label">Watching</span>
+                <span>{describeSubject(parsed.domain, parsed.subject)}</span>
+              </div>
+              <div className="row">
+                <span className="label">Fires when</span>
+                <span>{describeCondition(parsed.condition)}</span>
+              </div>
 
               {parsed.domain === 'weather' && (
                 <input

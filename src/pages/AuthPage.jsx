@@ -17,6 +17,7 @@ export default function AuthPage() {
   const [mode, setMode] = useState('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -60,6 +61,12 @@ export default function AuthPage() {
         return;
       }
       setInfo('Check your email for a link to reset your password.');
+      return;
+    }
+
+    if (mode === 'signup' && password !== confirmPassword) {
+      setSubmitting(false);
+      setError('Passwords do not match.');
       return;
     }
 
@@ -119,6 +126,16 @@ export default function AuthPage() {
               minLength={6}
             />
           )}
+          {mode === 'signup' && (
+            <input
+              type="password"
+              placeholder="Confirm password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              minLength={6}
+            />
+          )}
           {info && <p>{info}</p>}
           {error && <p className="error-text">{error}</p>}
           <button type="submit" className="button button-primary" disabled={submitting}>
@@ -153,12 +170,17 @@ export default function AuthPage() {
 
 function RecoveryForm({ onSubmit }) {
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
     setSubmitting(true);
     try {
       await onSubmit(password);
@@ -181,6 +203,14 @@ function RecoveryForm({ onSubmit }) {
             required
             minLength={6}
             autoFocus
+          />
+          <input
+            type="password"
+            placeholder="Confirm new password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+            minLength={6}
           />
           {error && <p className="error-text">{error}</p>}
           <button type="submit" className="button button-primary" disabled={submitting}>

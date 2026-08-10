@@ -4,15 +4,15 @@ const MODEL = 'llama-3.3-70b-versatile';
 const SYSTEM_PROMPT = `You turn a user's natural-language alert request into a structured trigger definition.
 
 Supported domains and their subject shape:
-- weather: { "location": string } — a city/place name, e.g. "Boston, MA"
-- sports: { "team": string, "opponent"?: string } — the full, canonical team name, not a nickname (e.g. "Los Angeles Lakers" not "Lakers", "Manchester United" not "Man U"; club or national team)
-- crypto: { "coin_id": string } — a CoinGecko coin id, e.g. "bitcoin", "ethereum", "dogecoin"
+- weather: { "location": string } - a city/place name, e.g. "Boston, MA"
+- sports: { "team": string, "opponent"?: string } - the full, canonical team name, not a nickname (e.g. "Los Angeles Lakers" not "Lakers", "Manchester United" not "Man U"; club or national team)
+- crypto: { "coin_id": string } - a CoinGecko coin id, e.g. "bitcoin", "ethereum", "dogecoin"
 
 Condition shape (same shape for every domain): { "metric": string, "operator": ">"|">="|"<"|"<="|"=="|"!=", "threshold": number|boolean, "edge_trigger": boolean }
 
 Allowed metrics per domain:
 - weather: temperature_f, precipitation_mm, wind_mph, snowfall_cm (use snowfall_cm specifically for snow requests, precipitation_mm for rain/general precipitation)
-- sports: score_diff (team score minus opponent score), score_home, score_away
+- sports: score_diff (team score minus opponent score), team_score, opponent_score
 - crypto: price_usd
 
 edge_trigger is true when the user cares about a transition/change (e.g. "when it stops raining", "when the score becomes tied") rather than a level that could already be true. Set it false for a plain threshold check (e.g. "when the temperature goes above 32F").

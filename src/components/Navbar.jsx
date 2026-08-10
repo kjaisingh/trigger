@@ -20,6 +20,10 @@ export default function Navbar() {
   return (
     <header className="navbar">
       <Link to="/" className="brand" onClick={closeMenu}>
+        <svg viewBox="0 0 32 32" className="brand-icon" aria-hidden="true">
+          <rect width="32" height="32" rx="7" fill="#0f1115" />
+          <path d="M17.5 4 8 18h6.5L14 28l9.5-14H17l3-10-2.5-.4z" fill="var(--accent)" />
+        </svg>
         Trigger
       </Link>
       <button
@@ -37,9 +41,6 @@ export default function Navbar() {
           <>
             <Link to="/dashboard" onClick={closeMenu}>
               Dashboard
-            </Link>
-            <Link to="/create" onClick={closeMenu}>
-              New trigger
             </Link>
             <Link to="/settings" onClick={closeMenu}>
               Settings

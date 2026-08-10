@@ -2,7 +2,7 @@
 // server (condition validation) and the client (create-trigger form).
 export const METRICS_BY_DOMAIN = {
   weather: ['temperature_f', 'precipitation_mm', 'wind_mph', 'snowfall_cm'],
-  sports: ['score_diff', 'score_home', 'score_away'],
+  sports: ['score_diff', 'team_score', 'opponent_score'],
   crypto: ['price_usd'],
 };
 
@@ -14,8 +14,8 @@ export const METRIC_LABELS = {
   wind_mph: 'Wind speed (mph)',
   snowfall_cm: 'Snowfall (cm)',
   score_diff: 'Score difference',
-  score_home: 'Home score',
-  score_away: 'Away score',
+  team_score: "Your team's score",
+  opponent_score: "Opponent's score",
   price_usd: 'Price (USD)',
 };
 

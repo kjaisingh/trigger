@@ -7,8 +7,7 @@ export function isValidCondition(domain, condition) {
   const metrics = METRICS_BY_DOMAIN[domain];
   if (!metrics || !metrics.includes(condition.metric)) return false;
   if (!OPERATORS.includes(condition.operator)) return false;
-  if (typeof condition.threshold !== 'number' && typeof condition.threshold !== 'boolean')
-    return false;
+  if (typeof condition.threshold !== 'number') return false;
   if (typeof condition.edge_trigger !== 'boolean') return false;
   return true;
 }

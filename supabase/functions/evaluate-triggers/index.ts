@@ -103,8 +103,8 @@ async function evaluateSports(subject: any, condition: any) {
 
   const valueByMetric: Record<string, number> = {
     score_diff: teamScore - opponentScore,
-    score_home: homeScore,
-    score_away: awayScore,
+    team_score: teamScore,
+    opponent_score: opponentScore,
   };
 
   const value = valueByMetric[condition.metric];
@@ -160,7 +160,7 @@ async function evaluateTrigger(trigger: any) {
       .eq('user_id', trigger.user_id);
     const payload = {
       title: 'Trigger fired',
-      body: `${trigger.raw_prompt} — ${result.description}`,
+      body: `${trigger.raw_prompt} - ${result.description}`,
     };
 
     const pushResults = await Promise.allSettled(

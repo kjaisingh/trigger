@@ -10,7 +10,7 @@ export default function LandingPage() {
     <div className="hero">
       <h1>Say it. We'll watch it.</h1>
       <p className="subtitle">
-        Describe what you're waiting for in plain English — weather, sports, or crypto prices.
+        Describe what you're waiting for in plain English - weather, sports, or crypto prices.
         Trigger watches it for you and pings you the moment it happens.
       </p>
       <Link to={user ? '/create' : '/auth'} className="button button-primary">
