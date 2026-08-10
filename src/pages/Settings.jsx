@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { disablePush, enablePush, getPushSubscription, isPushSupported } from '../lib/push.js';
+import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 
 export default function Settings() {
+  useDocumentTitle('Settings');
   const [pushSupported, setPushSupported] = useState(true);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [message, setMessage] = useState('');

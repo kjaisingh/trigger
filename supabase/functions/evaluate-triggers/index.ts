@@ -4,7 +4,10 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import webpush from 'npm:web-push@3.6.7';
 
-const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+const supabase = createClient(
+  Deno.env.get('SUPABASE_URL')!,
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+);
 
 webpush.setVapidDetails(
   Deno.env.get('VAPID_SUBJECT')!,
@@ -57,7 +60,9 @@ async function evaluateWeather(subject: any, condition: any) {
 
 async function fetchTeamEvents(teamId: string, endpoint: string) {
   const key = Deno.env.get('SPORTSDB_API_KEY') || '3';
-  const res = await fetch(`https://www.thesportsdb.com/api/v1/json/${key}/${endpoint}.php?id=${teamId}`);
+  const res = await fetch(
+    `https://www.thesportsdb.com/api/v1/json/${key}/${endpoint}.php?id=${teamId}`,
+  );
   if (!res.ok) throw new Error(`TheSportsDB lookup failed (${res.status})`);
   const data = await res.json();
   return data.events || data.results || [];
@@ -84,7 +89,10 @@ async function evaluateSports(subject: any, condition: any) {
   }
 
   if (!event) {
-    return { value: null, description: `No recent or upcoming match found for ${subject.teamName}.` };
+    return {
+      value: null,
+      description: `No recent or upcoming match found for ${subject.teamName}.`,
+    };
   }
 
   const homeScore = Number(event.intHomeScore);
@@ -146,12 +154,21 @@ async function evaluateTrigger(trigger: any) {
   const shouldFire = condition.edge_trigger ? met && !previouslyMet : met;
 
   if (shouldFire) {
-    const subs = await supabase.from('push_subscriptions').select('*').eq('user_id', trigger.user_id);
-    const payload = { title: 'Trigger fired', body: `${trigger.raw_prompt} — ${result.description}` };
+    const subs = await supabase
+      .from('push_subscriptions')
+      .select('*')
+      .eq('user_id', trigger.user_id);
+    const payload = {
+      title: 'Trigger fired',
+      body: `${trigger.raw_prompt} — ${result.description}`,
+    };
 
     const pushResults = await Promise.allSettled(
       (subs.data || []).map((sub: any) =>
-        webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, JSON.stringify(payload)),
+        webpush.sendNotification(
+          { endpoint: sub.endpoint, keys: sub.keys },
+          JSON.stringify(payload),
+        ),
       ),
     );
 
@@ -189,7 +206,10 @@ Deno.serve(async (req) => {
     return new Response('Unauthorized', { status: 401 });
   }
 
-  const { data: triggers, error } = await supabase.from('triggers').select('*').eq('status', 'active');
+  const { data: triggers, error } = await supabase
+    .from('triggers')
+    .select('*')
+    .eq('status', 'active');
   if (error) {
     return new Response(error.message, { status: 500 });
   }

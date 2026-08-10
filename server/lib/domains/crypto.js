@@ -17,7 +17,9 @@ export async function resolveSubject(subject) {
   const data = await res.json();
 
   if (!data[coinId]) {
-    throw new Error(`Couldn't find a coin matching "${coinId}". Use a CoinGecko coin id, e.g. "bitcoin" or "ethereum".`);
+    throw new Error(
+      `Couldn't find a coin matching "${coinId}". Use a CoinGecko coin id, e.g. "bitcoin" or "ethereum".`,
+    );
   }
 
   return { coinId };

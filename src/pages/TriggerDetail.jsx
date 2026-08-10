@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import StatusBadge from '../components/StatusBadge.jsx';
+import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 
 export default function TriggerDetail() {
   const { id } = useParams();
@@ -9,6 +10,11 @@ export default function TriggerDetail() {
   const [trigger, setTrigger] = useState(null);
   const [events, setEvents] = useState([]);
   const [error, setError] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [togglingStatus, setTogglingStatus] = useState(false);
+
+  useDocumentTitle(trigger ? trigger.raw_prompt : 'Trigger');
 
   useEffect(() => {
     api
@@ -24,14 +30,30 @@ export default function TriggerDetail() {
   if (!trigger) return <p className="empty-state">Loading...</p>;
 
   async function toggleStatus() {
-    const status = trigger.status === 'paused' ? 'active' : 'paused';
-    const updated = await api.patch(`/api/triggers/${id}`, { status });
-    setTrigger(updated);
+    setTogglingStatus(true);
+    try {
+      const status = trigger.status === 'paused' ? 'active' : 'paused';
+      const updated = await api.patch(`/api/triggers/${id}`, { status });
+      setTrigger(updated);
+    } finally {
+      setTogglingStatus(false);
+    }
   }
 
   async function handleDelete() {
-    await api.delete(`/api/triggers/${id}`);
-    navigate('/dashboard');
+    if (!confirmingDelete) {
+      setConfirmingDelete(true);
+      return;
+    }
+    setDeleting(true);
+    try {
+      await api.delete(`/api/triggers/${id}`);
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err.message);
+      setDeleting(false);
+      setConfirmingDelete(false);
+    }
   }
 
   const canToggle = trigger.status === 'active' || trigger.status === 'paused';
@@ -55,7 +77,8 @@ export default function TriggerDetail() {
               trigger.unsupported_reason
             ) : (
               <>
-                {trigger.condition.metric} {trigger.condition.operator} {String(trigger.condition.threshold)}
+                {trigger.condition.metric} {trigger.condition.operator}{' '}
+                {String(trigger.condition.threshold)}
                 {trigger.condition.edge_trigger ? ' (on transition)' : ''}
               </>
             )}
@@ -79,21 +102,21 @@ export default function TriggerDetail() {
         )}
       </div>
 
-      {canToggle && (
-        <div className="row">
-          <button className="button" onClick={toggleStatus}>
-            {trigger.status === 'paused' ? 'Resume' : 'Pause'}
+      <div className="row">
+        {canToggle && (
+          <button className="button" onClick={toggleStatus} disabled={togglingStatus}>
+            {togglingStatus ? 'Updating...' : trigger.status === 'paused' ? 'Resume' : 'Pause'}
           </button>
-          <button className="button button-danger" onClick={handleDelete}>
-            Delete
+        )}
+        {confirmingDelete && (
+          <button className="button" onClick={() => setConfirmingDelete(false)} disabled={deleting}>
+            Cancel
           </button>
-        </div>
-      )}
-      {!canToggle && (
-        <button className="button button-danger" onClick={handleDelete}>
-          Delete
+        )}
+        <button className="button button-danger" onClick={handleDelete} disabled={deleting}>
+          {deleting ? 'Deleting...' : confirmingDelete ? 'Confirm delete' : 'Delete'}
         </button>
-      )}
+      </div>
 
       <h3>History</h3>
       {events.length === 0 ? (

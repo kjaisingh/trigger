@@ -59,7 +59,12 @@ router.get('/', async (req, res, next) => {
 router.get('/:id', async (req, res, next) => {
   try {
     const trigger = unwrap(
-      await supabase.from('triggers').select('*').eq('id', req.params.id).eq('user_id', req.user.id).single(),
+      await supabase
+        .from('triggers')
+        .select('*')
+        .eq('id', req.params.id)
+        .eq('user_id', req.user.id)
+        .single(),
     );
 
     const events = unwrap(
@@ -161,7 +166,9 @@ router.patch('/:id', async (req, res, next) => {
 
 router.delete('/:id', async (req, res, next) => {
   try {
-    unwrap(await supabase.from('triggers').delete().eq('id', req.params.id).eq('user_id', req.user.id));
+    unwrap(
+      await supabase.from('triggers').delete().eq('id', req.params.id).eq('user_id', req.user.id),
+    );
     res.status(204).end();
   } catch (error) {
     next(error);

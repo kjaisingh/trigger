@@ -1,4 +1,5 @@
 # Trigger
+
 Tell it what you're waiting for, in plain English, and it alerts you the moment it happens.
 
 ## Overview

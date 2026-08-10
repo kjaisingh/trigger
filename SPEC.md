@@ -84,13 +84,15 @@ The whole point: "temp > 32°F in Boston" and "let me know when it stops raining
 **1. Domain routing.** Given the raw prompt, classify into `weather | sports | crypto | unsupported`. This is auto-routing, not a dropdown the user fills in first — they just type the sentence. The confirm screen (§8) shows the detected domain and lets them override it if the LLM guessed wrong, rather than forcing a manual pre-selection every time.
 
 **2. Condition extraction into a generalized DSL**, same shape regardless of domain:
+
 ```json
 { "metric": "temperature_f", "operator": ">", "threshold": 32, "edge_trigger": false }
 { "metric": "precipitation_mm", "operator": "==", "threshold": 0, "edge_trigger": true }
 ```
+
 `edge_trigger: true` means "fire on the transition" (was raining, now isn't) rather than "fire whenever this is currently true" (which would refire every poll). `metric` is validated server-side against an allow-list per domain (temperature_f, precipitation_mm, wind_mph for weather; score_diff, score_home, score_away for sports; price_usd for crypto) — if the LLM returns a metric outside that list, the answer is rejected and re-asked once, not silently coerced.
 
-**Feasibility fallback.** If the LLM can't map the prompt to a supported domain + metric (e.g. "let me know when my flight is delayed", "tell me when this product restocks") it returns `domain: "unsupported"` with a plain-English reason. The trigger is *not* silently force-fit into the nearest domain — it's saved as `status: 'unsupported'` and the UI tells the user plainly this isn't monitorable yet, pointing at the generic-web-crawling backlog item (§10) as the future answer for open-ended conditions.
+**Feasibility fallback.** If the LLM can't map the prompt to a supported domain + metric (e.g. "let me know when my flight is delayed", "tell me when this product restocks") it returns `domain: "unsupported"` with a plain-English reason. The trigger is _not_ silently force-fit into the nearest domain — it's saved as `status: 'unsupported'` and the UI tells the user plainly this isn't monitorable yet, pointing at the generic-web-crawling backlog item (§10) as the future answer for open-ended conditions.
 
 Evaluation itself (comparing fetched value against `{metric, operator, threshold}`) is deterministic code inside the Edge Function — the LLM is only called once, at creation time, not on every poll tick.
 

@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard.jsx';
 import CreateTrigger from './pages/CreateTrigger.jsx';
 import TriggerDetail from './pages/TriggerDetail.jsx';
 import Settings from './pages/Settings.jsx';
+import NotFound from './pages/NotFound.jsx';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -55,6 +56,7 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
     </>

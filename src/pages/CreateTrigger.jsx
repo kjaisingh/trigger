@@ -1,16 +1,32 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
+import { useDocumentTitle } from '../lib/useDocumentTitle.js';
+import {
+  METRIC_LABELS,
+  METRICS_BY_DOMAIN,
+  OPERATOR_LABELS,
+  OPERATORS,
+} from '../../shared/domains.js';
 
-const METRICS_BY_DOMAIN = {
-  weather: ['temperature_f', 'precipitation_mm', 'wind_mph', 'snowfall_cm'],
-  sports: ['score_diff', 'score_home', 'score_away'],
-  crypto: ['price_usd'],
-};
+function describeSubject(domain, subject) {
+  if (domain === 'weather') return subject.location || 'your location';
+  if (domain === 'sports')
+    return subject.opponent
+      ? `${subject.team} vs ${subject.opponent}`
+      : subject.team || 'your team';
+  if (domain === 'crypto') return subject.coin_id || 'your coin';
+  return '';
+}
 
-const OPERATORS = ['>', '>=', '<', '<=', '==', '!='];
+function describeCondition(condition) {
+  const metric = METRIC_LABELS[condition.metric] || condition.metric;
+  const operator = OPERATOR_LABELS[condition.operator] || condition.operator;
+  return `${metric} ${operator} ${condition.threshold}${condition.edge_trigger ? ', on transition only' : ''}`;
+}
 
 export default function CreateTrigger() {
+  useDocumentTitle('New trigger');
   const navigate = useNavigate();
   const [rawPrompt, setRawPrompt] = useState('');
   const [parsed, setParsed] = useState(null);
@@ -44,7 +60,12 @@ export default function CreateTrigger() {
     setParsed({
       domain,
       subject: {},
-      condition: { metric: METRICS_BY_DOMAIN[domain]?.[0], operator: '>', threshold: 0, edge_trigger: false },
+      condition: {
+        metric: METRICS_BY_DOMAIN[domain]?.[0],
+        operator: '>',
+        threshold: 0,
+        edge_trigger: false,
+      },
       unsupported_reason: null,
     });
   }
@@ -53,7 +74,12 @@ export default function CreateTrigger() {
     setError('');
     setLoading(true);
     try {
-      await api.post('/api/triggers', { raw_prompt: rawPrompt, ...parsed, recurring, channels: ['push'] });
+      await api.post('/api/triggers', {
+        raw_prompt: rawPrompt,
+        ...parsed,
+        recurring,
+        channels: ['push'],
+      });
       navigate('/dashboard');
     } catch (err) {
       setError(err.message);
@@ -94,9 +120,16 @@ export default function CreateTrigger() {
           </div>
 
           {parsed.domain === 'unsupported' ? (
-            <p className="error-text">{parsed.unsupported_reason || "This request isn't supported yet."}</p>
+            <p className="error-text">
+              {parsed.unsupported_reason || "This request isn't supported yet."}
+            </p>
           ) : (
             <>
+              <p className="subtitle-muted">
+                Watching: {describeSubject(parsed.domain, parsed.subject)}. Fires when:{' '}
+                {describeCondition(parsed.condition)}.
+              </p>
+
               {parsed.domain === 'weather' && (
                 <input
                   placeholder="Location"
@@ -135,7 +168,7 @@ export default function CreateTrigger() {
                 >
                   {METRICS_BY_DOMAIN[parsed.domain]?.map((metric) => (
                     <option key={metric} value={metric}>
-                      {metric}
+                      {METRIC_LABELS[metric] || metric}
                     </option>
                   ))}
                 </select>
@@ -145,14 +178,17 @@ export default function CreateTrigger() {
                 >
                   {OPERATORS.map((op) => (
                     <option key={op} value={op}>
-                      {op}
+                      {OPERATOR_LABELS[op] || op}
                     </option>
                   ))}
                 </select>
                 <input
                   type="number"
                   value={parsed.condition.threshold}
-                  onChange={(e) => updateConditionField('threshold', Number(e.target.value))}
+                  onChange={(e) => {
+                    const value = Number(e.target.value);
+                    updateConditionField('threshold', Number.isNaN(value) ? 0 : value);
+                  }}
                 />
               </div>
 
@@ -166,7 +202,11 @@ export default function CreateTrigger() {
               </label>
 
               <label className="checkbox-row">
-                <input type="checkbox" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} />
+                <input
+                  type="checkbox"
+                  checked={recurring}
+                  onChange={(e) => setRecurring(e.target.checked)}
+                />
                 Keep alerting every time this happens (recurring)
               </label>
             </>

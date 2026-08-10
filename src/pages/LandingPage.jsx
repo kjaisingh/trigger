@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 
 export default function LandingPage() {
   const { user } = useAuth();
+  useDocumentTitle();
 
   return (
     <div className="hero">

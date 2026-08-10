@@ -2,13 +2,18 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import TriggerCard from '../components/TriggerCard.jsx';
+import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 
 export default function Dashboard() {
+  useDocumentTitle('Dashboard');
   const [triggers, setTriggers] = useState(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    api.get('/api/triggers').then(setTriggers).catch((err) => setError(err.message));
+    api
+      .get('/api/triggers')
+      .then(setTriggers)
+      .catch((err) => setError(err.message));
   }, []);
 
   return (
