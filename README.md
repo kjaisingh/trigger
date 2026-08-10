@@ -16,6 +16,7 @@ Prompts that don't map to a supported domain are saved as `unsupported` with a p
 - **iOS push needs a home-screen install.** Safari only delivers web push to sites added to the home screen (Share → Add to Home Screen), not to a normal Safari tab.
 - **Third-party APIs are free-tier and can rate-limit.** Open-Meteo, TheSportsDB, and CoinGecko are all called with no key or a shared free key. If a check starts failing (e.g. a 429 from a rate limit), the trigger shows a "⚠ check failing" badge on its dashboard card and the specific error on its detail page — this clears on its own once a poll succeeds again, no action needed.
 - **Email confirmation depends on your Supabase Auth settings.** If "Confirm email" is enabled on the project, signing up won't sign the user in immediately — they'll see a message to check their inbox first.
+- **Two known dependency CVEs are currently unpatched**, both because the fix requires a breaking major-version migration rather than a drop-in patch: `react-router-dom` 6.x has an open-redirect issue (`<Link>`/`useNavigate` with a backslash) and an SSR error-deserialization issue, fixed only in 7.18.0+; Vite's bundled `esbuild` has a moderate dev-server advisory, fixed only in Vite 8. Run `npm audit` for details. Neither is exploitable in this app's actual usage (no SSR, dev server isn't exposed publicly), but both are flagged here for visibility.
 
 ## Feature Backlog
 
@@ -35,6 +36,7 @@ Prompts that don't map to a supported domain are saved as `unsupported` with a p
 - **LLM**: Groq (`llama-3.3-70b-versatile`) for one-time prompt parsing at trigger creation
 - **Notifications**: Web Push (VAPID), self-hosted, no vendor
 - **Deployment**: Render (free tier), same pattern as [jeopardy](../jeopardy) and [hivemind](../hivemind)
+- **Tooling**: ESLint 9 (flat config) + Prettier for linting/formatting; GitHub Actions runs lint + build on every push/PR to `main`
 
 ## Local Development
 
@@ -87,6 +89,8 @@ Connect this repo as a Render Blueprint (`render.yaml` is already configured):
 - `npm run dev` — frontend + backend concurrently, with reload
 - `npm run build` — production frontend build (`dist/`)
 - `npm start` — serve the built frontend + API (used by Render)
+- `npm run lint` — ESLint over the whole repo
+- `npm run format` — Prettier, writes fixes in place
 
 ## Environment Variables
 
