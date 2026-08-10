@@ -94,6 +94,8 @@ export default function AuthPage() {
     setMode(next);
   }
 
+  const mismatch = mode === 'signup' && confirmPassword.length > 0 && password !== confirmPassword;
+
   return (
     <div className="auth-page">
       <div className="card auth-card stack">
@@ -115,6 +117,7 @@ export default function AuthPage() {
             onChange={(e) => setEmail(e.target.value)}
             required
             autoFocus
+            autoComplete="email"
           />
           {mode !== 'forgot' && (
             <input
@@ -124,6 +127,7 @@ export default function AuthPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
+              autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
             />
           )}
           {mode === 'signup' && (
@@ -134,11 +138,13 @@ export default function AuthPage() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
               minLength={6}
+              autoComplete="new-password"
             />
           )}
+          {mismatch && <p className="error-text">Passwords don't match.</p>}
           {info && <p>{info}</p>}
           {error && <p className="error-text">{error}</p>}
-          <button type="submit" className="button button-primary" disabled={submitting}>
+          <button type="submit" className="button button-primary" disabled={submitting || mismatch}>
             {mode === 'signin' ? 'Sign in' : mode === 'signup' ? 'Sign up' : 'Send reset link'}
           </button>
         </form>
@@ -174,6 +180,8 @@ function RecoveryForm({ onSubmit }) {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  const mismatch = confirmPassword.length > 0 && password !== confirmPassword;
+
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
@@ -203,6 +211,7 @@ function RecoveryForm({ onSubmit }) {
             required
             minLength={6}
             autoFocus
+            autoComplete="new-password"
           />
           <input
             type="password"
@@ -211,9 +220,11 @@ function RecoveryForm({ onSubmit }) {
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
             minLength={6}
+            autoComplete="new-password"
           />
+          {mismatch && <p className="error-text">Passwords don't match.</p>}
           {error && <p className="error-text">{error}</p>}
-          <button type="submit" className="button button-primary" disabled={submitting}>
+          <button type="submit" className="button button-primary" disabled={submitting || mismatch}>
             Save password
           </button>
         </form>
