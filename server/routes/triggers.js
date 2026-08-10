@@ -7,6 +7,14 @@ import { isValidCondition, METRICS_BY_DOMAIN } from '../lib/domains/allowlist.js
 const router = Router();
 
 const SUPPORTED_DOMAINS = Object.keys(METRICS_BY_DOMAIN);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+router.param('id', (req, res, next, id) => {
+  if (!UUID_RE.test(id)) {
+    return res.status(400).json({ message: 'Invalid trigger ID.' });
+  }
+  next();
+});
 
 router.post('/parse', async (req, res, next) => {
   try {
