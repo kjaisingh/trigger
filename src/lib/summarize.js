@@ -33,11 +33,12 @@ function formatThreshold(metric, threshold) {
 
 export function describeSubject(domain, subject) {
   if (domain === 'weather') return subject.location || 'your location';
-  if (domain === 'sports')
-    return subject.opponent
-      ? `${subject.team} vs ${subject.opponent}`
-      : subject.team || 'your team';
-  if (domain === 'crypto') return subject.coin_id || 'your coin';
+  if (domain === 'sports') {
+    const team = subject.teamName || subject.team;
+    const opponent = subject.opponentName || subject.opponent;
+    return opponent ? `${team} vs ${opponent}` : team || 'your team';
+  }
+  if (domain === 'crypto') return subject.coinId || subject.coin_id || 'your coin';
   return '';
 }
 

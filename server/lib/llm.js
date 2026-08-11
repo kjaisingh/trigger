@@ -1,3 +1,5 @@
+import { fetchWithRetry } from './http.js';
+
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const MODEL = 'llama-3.3-70b-versatile';
 
@@ -28,7 +30,7 @@ Respond with only a JSON object shaped exactly like this:
 }`;
 
 export async function parsePrompt(rawPrompt) {
-  const res = await fetch(GROQ_URL, {
+  const res = await fetchWithRetry(GROQ_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

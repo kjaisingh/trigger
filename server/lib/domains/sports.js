@@ -1,10 +1,12 @@
+import { fetchWithRetry } from '../http.js';
+
 const BASE_URL = `https://www.thesportsdb.com/api/v1/json/${process.env.SPORTSDB_API_KEY || '3'}`;
 
 async function searchTeam(name) {
   const url = new URL(`${BASE_URL}/searchteams.php`);
   url.searchParams.set('t', name);
 
-  const res = await fetch(url);
+  const res = await fetchWithRetry(url);
   if (!res.ok) {
     throw new Error(`TheSportsDB lookup failed (${res.status}). Try again in a moment.`);
   }

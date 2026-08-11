@@ -1,3 +1,5 @@
+import { fetchWithRetry } from '../http.js';
+
 const GEOCODE_URL = 'https://geocoding-api.open-meteo.com/v1/search';
 
 export async function resolveSubject(subject) {
@@ -10,7 +12,7 @@ export async function resolveSubject(subject) {
   url.searchParams.set('name', location);
   url.searchParams.set('count', '1');
 
-  const res = await fetch(url);
+  const res = await fetchWithRetry(url);
   if (!res.ok) {
     throw new Error(`Weather lookup failed (${res.status}). Try again in a moment.`);
   }

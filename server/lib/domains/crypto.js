@@ -1,3 +1,5 @@
+import { fetchWithRetry } from '../http.js';
+
 const PRICE_URL = 'https://api.coingecko.com/api/v3/simple/price';
 
 export async function resolveSubject(subject) {
@@ -10,7 +12,7 @@ export async function resolveSubject(subject) {
   url.searchParams.set('ids', coinId);
   url.searchParams.set('vs_currencies', 'usd');
 
-  const res = await fetch(url);
+  const res = await fetchWithRetry(url);
   if (!res.ok) {
     throw new Error(`CoinGecko lookup failed (${res.status}). Try again in a moment.`);
   }
