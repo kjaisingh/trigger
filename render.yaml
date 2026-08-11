@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: trigger
+    name: Trigger
     env: node
     plan: free
     autoDeploy: true
