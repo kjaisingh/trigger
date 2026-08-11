@@ -15,6 +15,27 @@ webpush.setVapidDetails(
   Deno.env.get('VAPID_PRIVATE_KEY')!,
 );
 
+async function fetchWithRetry(
+  url: string | URL,
+  options: RequestInit = {},
+  { retries = 2, backoffMs = 300 } = {},
+): Promise<Response> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url, options);
+      if ((res.status === 429 || res.status >= 500) && attempt < retries) {
+        await new Promise((resolve) => setTimeout(resolve, backoffMs * 2 ** attempt));
+        continue;
+      }
+      return res;
+    } catch (err) {
+      if (attempt === retries) throw err;
+      await new Promise((resolve) => setTimeout(resolve, backoffMs * 2 ** attempt));
+    }
+  }
+  throw new Error('fetchWithRetry: exhausted retries');
+}
+
 function compare(value: number | boolean, operator: string, threshold: number | boolean) {
   switch (operator) {
     case '>':
@@ -42,7 +63,7 @@ async function evaluateWeather(subject: any, condition: any) {
   url.searchParams.set('temperature_unit', 'fahrenheit');
   url.searchParams.set('wind_speed_unit', 'mph');
 
-  const res = await fetch(url);
+  const res = await fetchWithRetry(url);
   if (!res.ok) throw new Error(`Open-Meteo lookup failed (${res.status})`);
   const data = await res.json();
   const current = data.current;
@@ -60,7 +81,7 @@ async function evaluateWeather(subject: any, condition: any) {
 
 async function fetchTeamEvents(teamId: string, endpoint: string) {
   const key = Deno.env.get('SPORTSDB_API_KEY') || '3';
-  const res = await fetch(
+  const res = await fetchWithRetry(
     `https://www.thesportsdb.com/api/v1/json/${key}/${endpoint}.php?id=${teamId}`,
   );
   if (!res.ok) throw new Error(`TheSportsDB lookup failed (${res.status})`);
@@ -119,7 +140,7 @@ async function evaluateCrypto(subject: any, condition: any) {
   url.searchParams.set('ids', subject.coinId);
   url.searchParams.set('vs_currencies', 'usd');
 
-  const res = await fetch(url);
+  const res = await fetchWithRetry(url);
   if (!res.ok) throw new Error(`CoinGecko lookup failed (${res.status})`);
   const data = await res.json();
   const value = data[subject.coinId]?.usd;

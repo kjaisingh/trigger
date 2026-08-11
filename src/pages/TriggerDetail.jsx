@@ -36,6 +36,8 @@ export default function TriggerDetail() {
       const status = trigger.status === 'paused' ? 'active' : 'paused';
       const updated = await api.patch(`/api/triggers/${id}`, { status });
       setTrigger(updated);
+    } catch (err) {
+      setError(err.message);
     } finally {
       setTogglingStatus(false);
     }
