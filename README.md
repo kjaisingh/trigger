@@ -5,10 +5,14 @@ Tell it what you're waiting for, in plain English, and it alerts you the moment 
 
 ## Overview
 - **Describe your condition**: type a plain-English sentence - "let me know when the rain clears up in Boston", "keep me posted if the England vs Ghana score becomes tied", "tell me when bitcoin drops below $80k".
-- **Parsed automatically**: an LLM converts the prompt into a structured `{domain, subject, condition}` once, at creation time.
+- **Parsed automatically**: an LLM converts the prompt into a structured `{domain, subject, condition}` once, at creation time - with an editable preview before you save it, so you can correct the domain, subject, or threshold if the parse isn't quite right.
+- **Choose how it fires**: make a trigger recurring (it keeps alerting every time the condition is met) or one-time (it fires once, then stops), and edge-triggered (only alert on the transition into being true) or level-triggered (alert on every check while it holds).
 - **Checked on a schedule**: a scheduled job polls the right data source on an interval and evaluates the condition.
 - **Notified the moment it's true**: a web push notification fires as soon as the condition is met.
-- **Handled gracefully when unsupported**: prompts that don't map to a supported domain are saved as `unsupported` with a plain-English reason, rather than force-fit into the nearest one.
+- **Manage triggers anytime**: pause or resume an active trigger, delete one (with a confirm step to avoid mis-taps), and see a running history of every time it's fired.
+- **Push notifications on your terms**: opt in or out anytime from Settings, and send yourself a test notification to confirm delivery before relying on it.
+- **Handled gracefully when unsupported**: prompts that don't map to a supported domain are saved as `unsupported` with a plain-English reason, rather than force-fit into the nearest one - or save anyway if you want to keep it for later.
+- **Surfaces check failures clearly**: if a poll or creation-time lookup fails, the trigger's card and detail page show the specific error - it clears on its own once a check succeeds again, no action needed.
 
 ## How It Works
 Supported domains, each backed by a free API:
@@ -18,20 +22,17 @@ Supported domains, each backed by a free API:
 
 Polling runs on Supabase `pg_cron` + `pg_net`, calling a Supabase Edge Function on a timer - no server-side cron process needed. See [Tech Stack](#tech-stack) for the rest of the pipeline.
 
-## Known Limitations
-- **Polling is coarse, not real-time.** Alerts land within the poll window (every 15 minutes by default), not the instant the condition becomes true.
-- **iOS push needs a home-screen install.** Safari only delivers web push to sites added to the home screen (Share → Add to Home Screen), not to a normal Safari tab.
-- **Third-party APIs are free-tier and can rate-limit.** Open-Meteo, TheSportsDB, and CoinGecko are all called with no key or a shared free key. Requests retry with backoff on a 429/5xx (both at trigger creation and on each poll), so a brief blip resolves on its own. If the rate limit persists past the retries, trigger creation surfaces the specific error, and an active trigger's dashboard card shows a "⚠ check failing" badge with the error on its detail page - this clears on its own once a poll succeeds again, no action needed.
-- **Email confirmation depends on your Supabase Auth settings.** If "Confirm email" is enabled on the project, signing up won't sign the user in immediately - they'll see a message to check their inbox first.
-- **Two known dependency CVEs are currently unpatched**, both because the fix requires a breaking major-version migration rather than a drop-in patch: `react-router-dom` 6.x has an open-redirect issue (`<Link>`/`useNavigate` with a backslash) and an SSR error-deserialization issue, fixed only in 7.18.0+; Vite's bundled `esbuild` has a moderate dev-server advisory, fixed only in Vite 8. Run `npm audit` for details. Neither is exploitable in this app's actual usage (no SSR, dev server isn't exposed publicly), but both are flagged here for visibility.
-
 ## Feature Backlog
 - Generic web-crawling condition (BYOK LLM) for prompts outside the three built-in domains
+- Stock/equity price domain (e.g. Alpha Vantage), alongside crypto
 - Gmail domain (new message from a given sender) - dropped from MVP to avoid the Google OAuth consent-screen setup and a token-encryption subsystem for a single domain
+- ESPN's unofficial scoreboard API as a broader sports source
+- Domain override as a first-class dropdown at creation time
+- Per-trigger custom poll interval, instead of the one global 15-minute `pg_cron` schedule
 - Email notification channel (nodemailer)
 - SMS via user-supplied Twilio key
-- Domain override as a first-class dropdown at creation time
-- ESPN's unofficial scoreboard API as a broader sports source
+- Digest mode - batch multiple triggers that fire in the same poll into a single push notification, instead of one per trigger
+- Manage push subscriptions across devices from Settings, not just the current one
 
 ## Tech Stack
 - **Frontend**: React + Vite, React Router
