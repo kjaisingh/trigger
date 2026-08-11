@@ -200,7 +200,7 @@ h3 {
 .button-primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: white;
+  color: var(--bg);
 }
 
 .button-primary:hover {
