@@ -1,4 +1,5 @@
 import { fetchWithRetry } from './http.js';
+import { PublicError } from './validation.js';
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const MODEL = 'llama-3.3-70b-versatile';
@@ -30,6 +31,9 @@ Respond with only a JSON object shaped exactly like this:
 }`;
 
 export async function parsePrompt(rawPrompt) {
+  if (!process.env.GROQ_API_KEY) {
+    throw new PublicError('Prompt parsing is unavailable. Try again later.', 503);
+  }
   const res = await fetchWithRetry(GROQ_URL, {
     method: 'POST',
     headers: {
@@ -48,8 +52,7 @@ export async function parsePrompt(rawPrompt) {
   });
 
   if (!res.ok) {
-    const detail = await res.text();
-    throw new Error(`Groq request failed: ${detail}`);
+    throw new Error(`Groq request failed (${res.status}).`);
   }
 
   const data = await res.json();

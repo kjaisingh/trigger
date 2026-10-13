@@ -3,6 +3,7 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import webpush from 'npm:web-push@3.6.7';
+import { decideFiring, pickLiveEvent } from '../_shared/evaluation.js';
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
@@ -18,11 +19,14 @@ webpush.setVapidDetails(
 async function fetchWithRetry(
   url: string | URL,
   options: RequestInit = {},
-  { retries = 2, backoffMs = 300 } = {},
+  { retries = 2, backoffMs = 300, timeoutMs = 8000 } = {},
 ): Promise<Response> {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const res = await fetch(url, options);
+      const signal = options.signal
+        ? AbortSignal.any([options.signal, AbortSignal.timeout(timeoutMs)])
+        : AbortSignal.timeout(timeoutMs);
+      const res = await fetch(url, { ...options, signal });
       if ((res.status === 429 || res.status >= 500) && attempt < retries) {
         await new Promise((resolve) => setTimeout(resolve, backoffMs * 2 ** attempt));
         continue;
@@ -34,25 +38,6 @@ async function fetchWithRetry(
     }
   }
   throw new Error('fetchWithRetry: exhausted retries');
-}
-
-function compare(value: number | boolean, operator: string, threshold: number | boolean) {
-  switch (operator) {
-    case '>':
-      return value > threshold;
-    case '>=':
-      return value >= threshold;
-    case '<':
-      return value < threshold;
-    case '<=':
-      return value <= threshold;
-    case '==':
-      return value === threshold;
-    case '!=':
-      return value !== threshold;
-    default:
-      return false;
-  }
 }
 
 async function evaluateWeather(subject: any, condition: any) {
@@ -67,6 +52,7 @@ async function evaluateWeather(subject: any, condition: any) {
   if (!res.ok) throw new Error(`Open-Meteo lookup failed (${res.status})`);
   const data = await res.json();
   const current = data.current;
+  if (!current) throw new Error('Open-Meteo returned no current conditions.');
 
   const valueByMetric: Record<string, number> = {
     temperature_f: current.temperature_2m,
@@ -76,6 +62,7 @@ async function evaluateWeather(subject: any, condition: any) {
   };
 
   const value = valueByMetric[condition.metric];
+  if (!Number.isFinite(value)) throw new Error('Open-Meteo returned no valid metric value.');
   return { value, description: `${subject.location} is at ${value} (${condition.metric})` };
 }
 
@@ -90,29 +77,16 @@ async function fetchTeamEvents(teamId: string, endpoint: string) {
 }
 
 async function evaluateSports(subject: any, condition: any) {
-  let events = await fetchTeamEvents(subject.teamId, 'eventsnext');
-  if (subject.opponentId) {
-    events = events.filter(
-      (e: any) => e.idAwayTeam === subject.opponentId || e.idHomeTeam === subject.opponentId,
-    );
-  }
-
-  let event = events.find((e: any) => e.intHomeScore !== null && e.intAwayScore !== null);
-
-  if (!event) {
-    let recent = await fetchTeamEvents(subject.teamId, 'eventslast');
-    if (subject.opponentId) {
-      recent = recent.filter(
-        (e: any) => e.idAwayTeam === subject.opponentId || e.idHomeTeam === subject.opponentId,
-      );
-    }
-    event = recent[0];
-  }
+  const [upcoming, recent] = await Promise.all([
+    fetchTeamEvents(subject.teamId, 'eventsnext'),
+    fetchTeamEvents(subject.teamId, 'eventslast'),
+  ]);
+  const event = pickLiveEvent(upcoming, recent, subject.teamId, subject.opponentId);
 
   if (!event) {
     return {
       value: null,
-      description: `No recent or upcoming match found for ${subject.teamName}.`,
+      description: `No live scored match found for ${subject.teamName}.`,
     };
   }
 
@@ -131,6 +105,7 @@ async function evaluateSports(subject: any, condition: any) {
   const value = valueByMetric[condition.metric];
   return {
     value,
+    eventId: event.idEvent,
     description: `${event.strHomeTeam} ${homeScore} - ${awayScore} ${event.strAwayTeam}`,
   };
 }
@@ -144,81 +119,124 @@ async function evaluateCrypto(subject: any, condition: any) {
   if (!res.ok) throw new Error(`CoinGecko lookup failed (${res.status})`);
   const data = await res.json();
   const value = data[subject.coinId]?.usd;
+  if (!Number.isFinite(value)) throw new Error('CoinGecko returned no valid price.');
 
   return { value, description: `${subject.coinId} is at $${value}` };
 }
 
+function checked(result: any) {
+  if (result.error) throw result.error;
+  return result.data;
+}
+
 async function evaluateTrigger(trigger: any) {
   const { domain, subject, condition } = trigger;
-
-  let result;
+  let result: { value: number | null; description: string; eventId?: string };
   try {
     if (domain === 'weather') result = await evaluateWeather(subject, condition);
     else if (domain === 'sports') result = await evaluateSports(subject, condition);
     else if (domain === 'crypto') result = await evaluateCrypto(subject, condition);
     else return;
-  } catch (err) {
-    await supabase
-      .from('triggers')
-      .update({
-        last_checked_at: new Date().toISOString(),
-        last_state: { ...(trigger.last_state || {}), error: err.message },
-      })
-      .eq('id', trigger.id);
-    throw err;
+  } catch (error) {
+    checked(
+      await supabase
+        .from('triggers')
+        .update({
+          last_checked_at: new Date().toISOString(),
+          last_state: { ...(trigger.last_state || {}), error: String(error) },
+        })
+        .eq('id', trigger.id)
+        .eq('status', 'active'),
+    );
+    throw error;
   }
 
-  if (result.value === null || result.value === undefined) return;
-
-  const met = compare(result.value, condition.operator, condition.threshold);
-  const previouslyMet = Boolean(trigger.last_state?.condition_met);
-  const shouldFire = condition.edge_trigger ? met && !previouslyMet : met;
-
-  if (shouldFire) {
-    const subs = await supabase
-      .from('push_subscriptions')
-      .select('*')
-      .eq('user_id', trigger.user_id);
-    const payload = {
-      title: 'Trigger fired',
-      body: `${trigger.raw_prompt} - ${result.description}`,
-    };
-
-    const pushResults = await Promise.allSettled(
-      (subs.data || []).map((sub: any) =>
-        webpush.sendNotification(
-          { endpoint: sub.endpoint, keys: sub.keys },
-          JSON.stringify(payload),
-        ),
-      ),
-    );
-
-    const deadEndpoints = (subs.data || [])
-      .filter((_: any, i: number) => {
-        const r = pushResults[i];
-        return r.status === 'rejected' && [404, 410].includes(r.reason?.statusCode);
+  const checkedAt = new Date().toISOString();
+  if (result.value === null || result.value === undefined) {
+    let update = supabase
+      .from('triggers')
+      .update({
+        last_checked_at: checkedAt,
+        last_state: {
+          condition_met: trigger.last_state?.condition_met ?? null,
+          event_id: trigger.last_state?.event_id ?? null,
+          note: result.description,
+        },
       })
-      .map((sub: any) => sub.endpoint);
+      .eq('id', trigger.id)
+      .eq('status', 'active');
+    update = trigger.last_checked_at
+      ? update.eq('last_checked_at', trigger.last_checked_at)
+      : update.is('last_checked_at', null);
+    checked(await update);
+    return;
+  }
+  if (!Number.isFinite(result.value)) throw new Error('Provider returned an invalid value.');
 
-    if (deadEndpoints.length) {
-      await supabase.from('push_subscriptions').delete().in('endpoint', deadEndpoints);
-    }
+  const { shouldFire, state } = decideFiring(
+    condition,
+    trigger.last_state,
+    result.value,
+    result.eventId || null,
+  );
+  let claim = supabase
+    .from('triggers')
+    .update({
+      last_checked_at: checkedAt,
+      last_state: state,
+      status: shouldFire && !trigger.recurring ? 'fired' : 'active',
+    })
+    .eq('id', trigger.id)
+    .eq('status', 'active');
+  claim = trigger.last_checked_at
+    ? claim.eq('last_checked_at', trigger.last_checked_at)
+    : claim.is('last_checked_at', null);
+  const claimed = checked(await claim.select('id'));
+  if (!claimed.length || !shouldFire) return;
 
+  const subs = checked(
+    await supabase.from('push_subscriptions').select('*').eq('user_id', trigger.user_id),
+  );
+  const payload = {
+    title: 'Trigger fired',
+    body: `${trigger.raw_prompt} - ${result.description}`,
+    url: `/triggers/${trigger.id}`,
+    tag: `trigger-${trigger.id}`,
+  };
+  const pushResults = await Promise.allSettled(
+    subs.map((sub: any) =>
+      webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, JSON.stringify(payload)),
+    ),
+  );
+  const deadEndpoints = subs
+    .filter((_: any, index: number) => {
+      const outcome = pushResults[index];
+      return outcome.status === 'rejected' && [404, 410].includes(outcome.reason?.statusCode);
+    })
+    .map((sub: any) => sub.endpoint);
+  if (deadEndpoints.length) {
+    checked(
+      await supabase
+        .from('push_subscriptions')
+        .delete()
+        .eq('user_id', trigger.user_id)
+        .in('endpoint', deadEndpoints),
+    );
+  }
+  const delivered = pushResults.filter((outcome: any) => outcome.status === 'fulfilled').length;
+  const failed = pushResults.length - delivered;
+  checked(
     await supabase.from('trigger_events').insert({
       trigger_id: trigger.id,
       payload,
-      channels_sent: ['push'],
-    });
-  }
-
-  await supabase
-    .from('triggers')
-    .update({
-      last_checked_at: new Date().toISOString(),
-      last_state: { value: result.value, condition_met: met },
-      status: shouldFire && !trigger.recurring ? 'fired' : trigger.status,
-    })
-    .eq('id', trigger.id);
+      channels_sent: delivered ? ['push'] : [],
+      error: !subs.length
+        ? 'No push subscription'
+        : failed
+          ? `${failed} push delivery failed`
+          : null,
+    }),
+  );
 }
 
 Deno.serve(async (req) => {

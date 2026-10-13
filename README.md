@@ -1,109 +1,71 @@
 # Trigger
+
 [![CI](https://github.com/kjaisingh/trigger/actions/workflows/ci.yml/badge.svg)](https://github.com/kjaisingh/trigger/actions/workflows/ci.yml)
 
-Tell it what you're waiting for, in plain English, and it alerts you the moment it happens.
+Trigger turns a plain-English request into a weather, sports, or crypto alert. You review and edit the parsed condition before saving it. A Supabase scheduled function checks active triggers every 15 minutes and sends browser push notifications when a condition fires. Alerts are not real time.
 
-## Overview
-- **Describe your condition**: type a plain-English sentence - "let me know when the rain clears up in Boston", "keep me posted if the England vs Ghana score becomes tied", "tell me when bitcoin drops below $80k".
-- **Parsed automatically**: an LLM converts the prompt into a structured `{domain, subject, condition}` once, at creation time - with an editable preview before you save it, so you can correct the domain, subject, or threshold if the parse isn't quite right.
-- **Choose how it fires**: make a trigger recurring (it keeps alerting every time the condition is met) or one-time (it fires once, then stops), and edge-triggered (only alert on the transition into being true) or level-triggered (alert on every check while it holds).
-- **Checked on a schedule**: a scheduled job polls the right data source on an interval and evaluates the condition.
-- **Notified the moment it's true**: a web push notification fires as soon as the condition is met.
-- **Manage triggers anytime**: pause or resume an active trigger, delete one (with a confirm step to avoid mis-taps), and see a running history of every time it's fired.
-- **Push notifications on your terms**: opt in or out anytime from Settings, and send yourself a test notification to confirm delivery before relying on it.
-- **Handled gracefully when unsupported**: prompts that don't map to a supported domain are saved as `unsupported` with a plain-English reason, rather than force-fit into the nearest one - or save anyway if you want to keep it for later.
-- **Surfaces check failures clearly**: if a poll or creation-time lookup fails, the trigger's card and detail page show the specific error - it clears on its own once a check succeeds again, no action needed.
+## What it supports
 
-## How It Works
-Supported domains, each backed by a free API:
-- **Weather** - [Open-Meteo](https://open-meteo.com)
-- **Sports** - [TheSportsDB](https://www.thesportsdb.com)
-- **Crypto prices** - [CoinGecko](https://www.coingecko.com)
+| Domain  | Data source                                | Metrics                                                              |
+| ------- | ------------------------------------------ | -------------------------------------------------------------------- |
+| Weather | [Open-Meteo](https://open-meteo.com)       | Temperature (°F), precipitation (mm), wind (mph), snowfall (cm)      |
+| Sports  | [TheSportsDB](https://www.thesportsdb.com) | Team score, opponent score, score difference for a live scored match |
+| Crypto  | [CoinGecko](https://www.coingecko.com)     | USD price                                                            |
 
-Polling runs on Supabase `pg_cron` + `pg_net`, calling a Supabase Edge Function on a timer - no server-side cron process needed. See [Tech Stack](#tech-stack) for the rest of the pipeline.
+A level trigger fires on each check while its condition is true if recurring is enabled. An edge trigger first records a baseline, then fires only when the condition changes from false to true. A one-time trigger becomes `fired` after its first match. Unsupported requests can be saved for reference, but are not monitored. Push delivery requires an enabled subscription on the device; history records when a condition fired even if no push reached a device.
 
-## Feature Backlog
-- Generic web-crawling condition (BYOK LLM) for prompts outside the three built-in domains
-- Stock/equity price domain (e.g. Alpha Vantage), alongside crypto
-- Gmail domain (new message from a given sender) - dropped from MVP to avoid the Google OAuth consent-screen setup and a token-encryption subsystem for a single domain
-- ESPN's unofficial scoreboard API as a broader sports source
-- Domain override as a first-class dropdown at creation time
-- Per-trigger custom poll interval, instead of the one global 15-minute `pg_cron` schedule
-- Email notification channel (nodemailer)
-- SMS via user-supplied Twilio key
-- Digest mode - batch multiple triggers that fire in the same poll into a single push notification, instead of one per trigger
-- Manage push subscriptions across devices from Settings, not just the current one
+Sports scores depend on the provider exposing a scored live event. Completed games and fixtures without scores do not fire alerts. Free data sources can rate limit or delay updates. The 15-minute schedule adds up to one polling interval of delay, plus provider and push delivery latency.
 
-## Tech Stack
-- **Frontend**: React + Vite, React Router
-- **Backend**: Node.js + Express, serving the built frontend and the API from a single Render web service
-- **Database / Auth**: Supabase (Postgres + Row Level Security, Supabase Auth with email/password)
-- **Scheduling**: Supabase `pg_cron` + `pg_net`, calling a Supabase Edge Function on a timer - no server-side cron needed
-- **LLM**: Groq (`llama-3.3-70b-versatile`) for one-time prompt parsing at trigger creation
-- **Notifications**: Web Push (VAPID), self-hosted, no vendor
-- **Deployment**: Render (free tier), same pattern as [jeopardy](../jeopardy) and [hivemind](../hivemind)
-- **Tooling**: ESLint 9 (flat config) + Prettier for linting/formatting; GitHub Actions runs lint + build on every push/PR to `main`
+## Architecture
 
-## Local Development
+- React/Vite client and Express API run together on Render. Supabase Auth handles email/password sign-in; the API checks the user's bearer token.
+- Supabase Postgres stores triggers, events, and push subscriptions. Row level security protects user data; the server and Edge Function use a service role key.
+- Supabase `pg_cron` and `pg_net` invoke `evaluate-triggers`. This runs independently of the Render web service. Groq parses a prompt once when you create a trigger; evaluation uses deterministic comparisons.
+- Web Push uses a VAPID key pair. The app can be installed from its web manifest. On iPhone, push requires adding the site to the Home Screen.
 
-### 1. Supabase project setup
-1. Create a new project at [supabase.com](https://supabase.com).
-2. In the SQL editor, run [`supabase/schema.sql`](supabase/schema.sql) to create the tables, RLS policies, and (commented-out) `pg_cron` job.
-3. Grab the project URL, anon key, and service role key from Project Settings → API.
+## Local setup
 
-### 2. Environment variables
-Copy `.env.example` to `.env` and fill in the values described in [Environment Variables](#environment-variables). VAPID keys can be generated with `./node_modules/.bin/web-push generate-vapid-keys` after `npm install`.
+1. Install Node.js 22.12 or newer, the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started), and a Supabase project. Run [`supabase/schema.sql`](supabase/schema.sql) in the project's SQL editor. It creates tables, indexes, and RLS policies; run it once for a new project.
+2. Run `npm ci`. Copy `.env.example` to `.env` and fill in Supabase URL and keys, a [Groq API key](https://console.groq.com), and VAPID keys from `npx web-push generate-vapid-keys`. Use the same VAPID public key in `VAPID_PUBLIC_KEY` and `VITE_VAPID_PUBLIC_KEY`. The service role and private VAPID keys must stay server-side.
+3. Run `npm run dev`. Open `http://localhost:5173`; the API runs at `http://localhost:3001`. `CLIENT_URL` allows the local Vite origin; `VITE_API_URL` points the client to the local API. Supabase's scheduled evaluator is separate, so creating a trigger locally does not start local polling.
+4. In the app, sign up, create a trigger, then enable push in Settings. Browser push needs HTTPS or localhost and browser permission.
 
-### 3. Deploy the Edge Function
+## Deploy
+
+1. Create a Render Blueprint from [`render.yaml`](render.yaml), or create one Node web service with build command `npm ci && npm run build`, start command `npm start`, and health check `/api/health`. Fill in the service's Supabase, Groq, and VAPID environment variables. The frontend and API share an origin on Render, so `VITE_API_URL` and `CLIENT_URL` are not needed there. `VITE_*` values are embedded during build; changing them requires a rebuild.
+2. Set Edge Function secrets with the same VAPID key pair and a new random `CRON_SHARED_SECRET`. Supabase provides `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to hosted Edge Functions. Then deploy the function:
+
+   ```bash
+   supabase secrets set --project-ref <project-ref> VAPID_SUBJECT=mailto:you@example.com VAPID_PUBLIC_KEY=<public-key> VAPID_PRIVATE_KEY=<private-key> CRON_SHARED_SECRET=<random-secret> SPORTSDB_API_KEY=3
+   supabase functions deploy evaluate-triggers --project-ref <project-ref>
+   ```
+
+3. Edit the commented `cron.schedule` block at the end of [`supabase/schema.sql`](supabase/schema.sql): enter the project ref, service role key, and the same cron secret, then run that block in the Supabase SQL editor. Keep these credentials out of Git. It schedules a check every 15 minutes.
+4. Check `/api/health`, sign in, send a test notification from Settings, and inspect a trigger's Last checked and History fields after a scheduled run. Render deployment does **not** deploy the Supabase function or SQL; repeat function deployment after changing its code.
+
+## Configuration
+
+[`.env.example`](.env.example) lists local variables. Render's Blueprint lists deployed web-service variables. `SUPABASE_SERVICE_ROLE_KEY`, `GROQ_API_KEY`, and `VAPID_PRIVATE_KEY` are secrets. `VITE_SUPABASE_ANON_KEY` and `VITE_VAPID_PUBLIC_KEY` are intentionally public. The Edge Function additionally needs `CRON_SHARED_SECRET` (not the Render service). `SPORTSDB_API_KEY` defaults to the free test key `3`.
+
+## Checks
+
 ```bash
-supabase functions deploy evaluate-triggers --project-ref <your-project-ref>
-supabase secrets set --project-ref <your-project-ref> \
-  SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... VAPID_SUBJECT=... \
-  VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... CRON_SHARED_SECRET=... SPORTSDB_API_KEY=3
+npm ci
+npm audit --audit-level=moderate
+npm run format:check
+npm run lint
+npm test
+npm run build
+deno check supabase/functions/evaluate-triggers/index.ts
 ```
-Then uncomment and run the `cron.schedule(...)` block at the bottom of `schema.sql` (with the real project ref, service role key, and cron secret filled in) to start the 15-minute poll.
 
-### 4. Run the app
-```bash
-npm install
-npm run dev
-```
-Frontend on `http://localhost:5173`, API on `http://localhost:3001`.
+GitHub Actions runs these checks on pushes and pull requests to `main`. Dependabot proposes weekly npm and Actions updates. `npm run format` writes Prettier changes. The API's unauthenticated health check is `/api/health`.
 
-## Scripts
-- `npm run dev` - frontend + backend concurrently, with reload
-- `npm run build` - production frontend build (`dist/`)
-- `npm start` - serve the built frontend + API (used by Render)
-- `npm run lint` - ESLint over the whole repo
-- `npm run format` - Prettier, writes fixes in place
+## Current limits
 
-## Testing & CI
-No automated test suite yet. [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs `npm run lint` and `npm run build` on every push and PR to `main`.
+- Only push notifications are implemented. Notification permission and subscription are per device; Settings controls the current device.
+- One global 15-minute schedule checks active triggers. Provider freshness and rate limits can delay or prevent a check. Check errors appear on the trigger card and detail page.
+- The free TheSportsDB API may not expose every live game's score. Trigger skips completed games rather than alerting on stale results.
+- Groq parsing and geocoding/team/coin lookup require network access when creating a trigger. The API limits parse requests to ten per user per minute and caps prompt length at 500 characters.
 
-## Deployment
-
-### Blueprint
-1. New → Blueprint on Render, point it at the `trigger` GitHub repo.
-2. Render creates one free web service. Fill in the `sync: false` environment variables in the dashboard (same values as your local `.env` - set `BASE_URL`/`CLIENT_URL`/`VITE_API_URL` to the deployed Render URL instead of localhost).
-3. `CRON_SHARED_SECRET` is auto-generated by Render if left blank - if you already deployed the Edge Function with your local value, paste that in instead so they match.
-
-### Manual Web Service
-- Build Command: `npm install && npm run build`
-- Start Command: `npm start`
-- Runtime: Node 22+
-- Set env vars per [Environment Variables](#environment-variables), using the deployed Render URL instead of localhost for `BASE_URL`/`CLIENT_URL`/`VITE_API_URL`.
-
-## Environment Variables
-Full defaults and comments are in [`.env.example`](.env.example).
-
-- `PORT` - backend port (default `3001`).
-- `BASE_URL` - public URL of the backend.
-- `CLIENT_URL` - allowed frontend origin.
-- `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` - Supabase project URL and anon key, read by the frontend.
-- `VITE_API_URL` - backend URL the frontend calls in local development.
-- `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` - server-only Supabase project URL and `service_role` key (Settings → API). Bypasses RLS by design - never expose it client-side.
-- `GROQ_API_KEY` - free key from [console.groq.com](https://console.groq.com), used to parse trigger prompts.
-- `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VITE_VAPID_PUBLIC_KEY` - Web Push keys, generate with `npx web-push generate-vapid-keys`.
-- `VAPID_SUBJECT` - contact URI (`mailto:you@example.com`) sent with push subscriptions.
-- `SPORTSDB_API_KEY` - TheSportsDB key; the free test key `3` works out of the box.
-- `CRON_SHARED_SECRET` - random string shared between the Edge Function and the `pg_cron` job that calls it.
+See [`SPEC.md`](SPEC.md) for the data contract and evaluation rules.

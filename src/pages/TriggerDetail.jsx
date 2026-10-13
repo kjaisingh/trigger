@@ -10,7 +10,9 @@ export default function TriggerDetail() {
   const navigate = useNavigate();
   const [trigger, setTrigger] = useState(null);
   const [events, setEvents] = useState([]);
-  const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
   const [deleting, setDeleting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [togglingStatus, setTogglingStatus] = useState(false);
@@ -18,26 +20,55 @@ export default function TriggerDetail() {
   useDocumentTitle(trigger ? trigger.raw_prompt : 'Trigger');
 
   useEffect(() => {
+    let active = true;
     api
       .get(`/api/triggers/${id}`)
       .then(({ events, ...trigger }) => {
-        setTrigger(trigger);
-        setEvents(events);
+        if (active) {
+          setTrigger(trigger);
+          setEvents(events);
+        }
       })
-      .catch((err) => setError(err.message));
-  }, [id]);
+      .catch((err) => {
+        if (active) setLoadError(err.message);
+      });
+    return () => {
+      active = false;
+    };
+  }, [id, reloadKey]);
 
-  if (error) return <p className="empty-state">Couldn't load this trigger: {error}</p>;
-  if (!trigger) return <p className="empty-state">Loading...</p>;
+  if (loadError)
+    return (
+      <div className="empty-state" role="alert">
+        <p>Couldn't load this trigger: {loadError}</p>
+        <button
+          type="button"
+          className="button"
+          onClick={() => {
+            setLoadError('');
+            setReloadKey((key) => key + 1);
+          }}
+        >
+          Try again
+        </button>
+      </div>
+    );
+  if (!trigger || trigger.id !== id)
+    return (
+      <p className="empty-state" role="status">
+        Loading trigger...
+      </p>
+    );
 
   async function toggleStatus() {
+    setActionError('');
     setTogglingStatus(true);
     try {
       const status = trigger.status === 'paused' ? 'active' : 'paused';
       const updated = await api.patch(`/api/triggers/${id}`, { status });
       setTrigger(updated);
     } catch (err) {
-      setError(err.message);
+      setActionError(err.message);
     } finally {
       setTogglingStatus(false);
     }
@@ -48,12 +79,13 @@ export default function TriggerDetail() {
       setConfirmingDelete(true);
       return;
     }
+    setActionError('');
     setDeleting(true);
     try {
       await api.delete(`/api/triggers/${id}`);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.message);
+      setActionError(err.message);
       setDeleting(false);
       setConfirmingDelete(false);
     }
@@ -63,6 +95,11 @@ export default function TriggerDetail() {
 
   return (
     <div className="stack">
+      {actionError && (
+        <p className="error-text" role="alert">
+          {actionError}
+        </p>
+      )}
       <div className="row row-between">
         <h2>{trigger.raw_prompt}</h2>
         <StatusBadge status={trigger.status} />
@@ -97,6 +134,12 @@ export default function TriggerDetail() {
             <span className="warn-text">Failed - {trigger.last_state.error}</span>
           </div>
         )}
+        {trigger.last_state?.note && (
+          <div className="row">
+            <span className="label">Last check</span>
+            <span>{trigger.last_state.note}</span>
+          </div>
+        )}
       </div>
 
       <div className="row">
@@ -123,7 +166,11 @@ export default function TriggerDetail() {
           {events.map((event) => (
             <li key={event.id} className="card">
               <div>{event.payload.body}</div>
-              <div className="event-time">{new Date(event.fired_at).toLocaleString()}</div>
+              <div className="event-time">
+                {new Date(event.fired_at).toLocaleString()} ·{' '}
+                {event.channels_sent?.length ? 'Push sent' : 'No push sent'}
+              </div>
+              {event.error && <div className="warn-text">{event.error}</div>}
             </li>
           ))}
         </ul>

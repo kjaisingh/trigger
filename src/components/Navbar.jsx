@@ -18,7 +18,12 @@ export default function Navbar() {
   }
 
   return (
-    <header className="navbar">
+    <header
+      className="navbar"
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') closeMenu();
+      }}
+    >
       <Link to="/" className="brand" onClick={closeMenu}>
         <svg viewBox="0 0 32 32" className="brand-icon" aria-hidden="true">
           <rect width="32" height="32" rx="7" fill="#0f1115" />
@@ -30,13 +35,18 @@ export default function Navbar() {
         className={`nav-toggle ${menuOpen ? 'is-open' : ''}`}
         aria-label="Toggle navigation menu"
         aria-expanded={menuOpen}
+        aria-controls="main-navigation"
         onClick={() => setMenuOpen((open) => !open)}
       >
         <span />
         <span />
         <span />
       </button>
-      <nav className={`nav-links ${menuOpen ? 'is-open' : ''}`}>
+      <nav
+        id="main-navigation"
+        aria-label="Main navigation"
+        className={`nav-links ${menuOpen ? 'is-open' : ''}`}
+      >
         {user ? (
           <>
             <Link to="/dashboard" onClick={closeMenu}>

@@ -8,11 +8,14 @@ export async function requireAuth(req, res, next) {
     return res.status(401).json({ message: 'Authentication required.' });
   }
 
-  const { data, error } = await supabase.auth.getUser(token);
-  if (error || !data.user) {
-    return res.status(401).json({ message: 'Invalid or expired session.' });
+  try {
+    const { data, error } = await supabase.auth.getUser(token);
+    if (error || !data.user) {
+      return res.status(401).json({ message: 'Invalid or expired session.' });
+    }
+    req.user = data.user;
+    next();
+  } catch (error) {
+    next(error);
   }
-
-  req.user = data.user;
-  next();
 }

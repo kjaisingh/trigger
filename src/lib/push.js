@@ -8,7 +8,7 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 export async function isPushSupported() {
-  return 'serviceWorker' in navigator && 'PushManager' in window;
+  return window.isSecureContext && 'serviceWorker' in navigator && 'PushManager' in window;
 }
 
 export async function getPushSubscription() {
@@ -17,6 +17,9 @@ export async function getPushSubscription() {
 }
 
 export async function enablePush() {
+  if (!import.meta.env.VITE_VAPID_PUBLIC_KEY) {
+    throw new Error('Push notifications are unavailable. Please contact the site owner.');
+  }
   const registration = await navigator.serviceWorker.register('/sw.js');
   const existing = await registration.pushManager.getSubscription();
   const subscription =

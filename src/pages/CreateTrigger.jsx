@@ -1,8 +1,13 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
-import { METRIC_LABELS, METRICS_BY_DOMAIN, OPERATOR_LABELS, OPERATORS } from '../../shared/domains.js';
+import {
+  METRIC_LABELS,
+  METRICS_BY_DOMAIN,
+  OPERATOR_LABELS,
+  OPERATORS,
+} from '../../shared/domains.js';
 import { describeSubject, describeCondition } from '../lib/summarize.js';
 
 export default function CreateTrigger() {
@@ -13,16 +18,18 @@ export default function CreateTrigger() {
   const [recurring, setRecurring] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const promptVersion = useRef(0);
 
   async function handleParse(e) {
     e.preventDefault();
+    const version = promptVersion.current;
     setError('');
     setLoading(true);
     try {
       const result = await api.post('/api/triggers/parse', { raw_prompt: rawPrompt });
-      setParsed(result);
+      if (version === promptVersion.current) setParsed(result);
     } catch (err) {
-      setError(err.message);
+      if (version === promptVersion.current) setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -73,25 +80,47 @@ export default function CreateTrigger() {
       <h2>New trigger</h2>
 
       <form onSubmit={handleParse} className="stack">
+        <label htmlFor="trigger-prompt">What should Trigger watch?</label>
         <textarea
+          id="trigger-prompt"
           placeholder="e.g. Let me know when it stops raining in Boston"
           value={rawPrompt}
-          onChange={(e) => setRawPrompt(e.target.value)}
+          onChange={(e) => {
+            promptVersion.current += 1;
+            setRawPrompt(e.target.value);
+            setParsed(null);
+          }}
           rows={3}
+          maxLength={500}
           required
         />
-        <button type="submit" className="button button-primary" disabled={loading}>
-          Continue
+        <p className="muted">
+          Conditions are checked every 15 minutes. Alerts may arrive later than the event.
+        </p>
+        <button
+          type="submit"
+          className="button button-primary"
+          disabled={loading || !rawPrompt.trim()}
+        >
+          {loading ? 'Interpreting...' : 'Continue'}
         </button>
       </form>
 
-      {error && <p className="error-text">{error}</p>}
+      {error && (
+        <p className="error-text" role="alert">
+          {error}
+        </p>
+      )}
 
       {parsed && (
         <div className="card confirm-card stack">
           <div className="row">
             <label>Domain</label>
-            <select value={parsed.domain} onChange={(e) => changeDomain(e.target.value)}>
+            <select
+              aria-label="Domain"
+              value={parsed.domain}
+              onChange={(e) => changeDomain(e.target.value)}
+            >
               <option value="weather">Weather</option>
               <option value="sports">Sports</option>
               <option value="crypto">Crypto</option>
@@ -116,6 +145,7 @@ export default function CreateTrigger() {
 
               {parsed.domain === 'weather' && (
                 <input
+                  aria-label="Location"
                   placeholder="Location"
                   value={parsed.subject.location || ''}
                   onChange={(e) => updateSubjectField('location', e.target.value)}
@@ -125,11 +155,13 @@ export default function CreateTrigger() {
               {parsed.domain === 'sports' && (
                 <>
                   <input
+                    aria-label="Team"
                     placeholder="Team"
                     value={parsed.subject.team || ''}
                     onChange={(e) => updateSubjectField('team', e.target.value)}
                   />
                   <input
+                    aria-label="Opponent (optional)"
                     placeholder="Opponent (optional)"
                     value={parsed.subject.opponent || ''}
                     onChange={(e) => updateSubjectField('opponent', e.target.value)}
@@ -139,6 +171,7 @@ export default function CreateTrigger() {
 
               {parsed.domain === 'crypto' && (
                 <input
+                  aria-label="Coin id"
                   placeholder="Coin id (e.g. bitcoin)"
                   value={parsed.subject.coin_id || ''}
                   onChange={(e) => updateSubjectField('coin_id', e.target.value)}
@@ -147,6 +180,7 @@ export default function CreateTrigger() {
 
               <div className="row condition-row">
                 <select
+                  aria-label="Metric"
                   value={parsed.condition.metric}
                   onChange={(e) => updateConditionField('metric', e.target.value)}
                 >
@@ -157,6 +191,7 @@ export default function CreateTrigger() {
                   ))}
                 </select>
                 <select
+                  aria-label="Comparison"
                   value={parsed.condition.operator}
                   onChange={(e) => updateConditionField('operator', e.target.value)}
                 >
@@ -167,7 +202,9 @@ export default function CreateTrigger() {
                   ))}
                 </select>
                 <input
+                  aria-label="Threshold"
                   type="number"
+                  step="any"
                   value={parsed.condition.threshold}
                   onChange={(e) => {
                     const value = Number(e.target.value);
@@ -196,7 +233,12 @@ export default function CreateTrigger() {
             </>
           )}
 
-          <button className="button button-primary" onClick={handleCreate} disabled={loading}>
+          <button
+            type="button"
+            className="button button-primary"
+            onClick={handleCreate}
+            disabled={loading}
+          >
             {parsed.domain === 'unsupported' ? 'Save anyway' : 'Create trigger'}
           </button>
         </div>

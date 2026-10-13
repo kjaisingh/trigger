@@ -5,23 +5,42 @@ import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 
 export default function Settings() {
   useDocumentTitle('Settings');
-  const [pushSupported, setPushSupported] = useState(true);
+  const [pushSupported, setPushSupported] = useState(null);
   const [pushEnabled, setPushEnabled] = useState(false);
-  const [message, setMessage] = useState('');
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState(null);
 
   useEffect(() => {
-    isPushSupported().then((supported) => {
+    let mounted = true;
+    async function load() {
+      const supported = await isPushSupported();
+      if (!mounted) return;
       setPushSupported(supported);
       if (supported) {
-        getPushSubscription()
-          .then((sub) => setPushEnabled(Boolean(sub)))
-          .catch(() => setPushEnabled(false));
+        try {
+          const subscription = await getPushSubscription();
+          if (subscription) await api.post('/api/push/subscribe', { subscription });
+          if (mounted) setPushEnabled(Boolean(subscription));
+        } catch (error) {
+          if (mounted) {
+            setPushEnabled(false);
+            setMessage({
+              error: true,
+              text: error.message || "Couldn't check this device's subscription.",
+            });
+          }
+        }
       }
-    });
+    }
+    load();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   async function togglePush() {
-    setMessage('');
+    setMessage(null);
+    setPending(true);
     try {
       if (pushEnabled) {
         await disablePush();
@@ -30,49 +49,70 @@ export default function Settings() {
         await enablePush();
         setPushEnabled(true);
       }
-    } catch (err) {
-      setMessage(
-        err.name === 'NotAllowedError' || err.name === 'AbortError'
-          ? "Notifications are blocked for this site. Allow them in your browser's site settings and try again."
-          : err.message || "Couldn't update push notifications.",
-      );
+    } catch (error) {
+      setMessage({
+        error: true,
+        text:
+          error.name === 'NotAllowedError' || error.name === 'AbortError'
+            ? 'Notifications are blocked for this site. Allow them in your browser settings and try again.'
+            : error.message || "Couldn't update push notifications.",
+      });
+    } finally {
+      setPending(false);
     }
   }
 
   async function sendTestPush() {
-    setMessage('');
+    setMessage(null);
+    setPending(true);
     try {
-      await api.post('/api/push/test', {});
-      setMessage('Test notification sent.');
-    } catch (err) {
-      setMessage(err.message);
+      const subscription = await getPushSubscription();
+      if (!subscription) throw new Error('Enable notifications on this device first.');
+      await api.post('/api/push/test', { endpoint: subscription.endpoint });
+      setMessage({ error: false, text: 'Test notification sent to this device.' });
+    } catch (error) {
+      setMessage({ error: true, text: error.message });
+    } finally {
+      setPending(false);
     }
   }
 
   return (
-    <div className="stack">
+    <div className="stack settings-page">
       <h2>Settings</h2>
-
       <div className="card stack">
         <h3>Push notifications</h3>
-        {pushSupported ? (
+        <p className="muted">Get alerts on this device, even when Trigger is closed.</p>
+        {pushSupported === null ? (
+          <p>Checking browser support...</p>
+        ) : pushSupported ? (
           <>
             <div className="row row-between">
               <span>{pushEnabled ? 'Enabled on this device' : 'Not enabled on this device'}</span>
-              <button className="button" onClick={togglePush}>
-                {pushEnabled ? 'Disable' : 'Enable'}
+              <button type="button" className="button" onClick={togglePush} disabled={pending}>
+                {pending ? 'Working...' : pushEnabled ? 'Disable' : 'Enable'}
               </button>
             </div>
             {pushEnabled && (
-              <button className="button" onClick={sendTestPush}>
+              <button type="button" className="button" onClick={sendTestPush} disabled={pending}>
                 Send test notification
               </button>
             )}
           </>
         ) : (
-          <p className="empty-state">Push notifications aren't supported in this browser.</p>
+          <p className="empty-state">
+            Push needs a supported browser and HTTPS. On iPhone, add Trigger to your Home Screen
+            first.
+          </p>
         )}
-        {message && <p>{message}</p>}
+        {message && (
+          <p
+            role={message.error ? 'alert' : 'status'}
+            className={message.error ? 'error-text' : ''}
+          >
+            {message.text}
+          </p>
+        )}
       </div>
     </div>
   );

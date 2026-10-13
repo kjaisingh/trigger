@@ -110,7 +110,9 @@ export default function AuthPage() {
           <p className="subtitle-muted">Enter your email and we'll send you a reset link.</p>
         )}
         <form onSubmit={handleSubmit} className="stack">
+          <label htmlFor="auth-email">Email</label>
           <input
+            id="auth-email"
             type="email"
             placeholder="Email"
             value={email}
@@ -120,30 +122,42 @@ export default function AuthPage() {
             autoComplete="email"
           />
           {mode !== 'forgot' && (
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-              autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-            />
+            <>
+              <label htmlFor="auth-password">Password</label>
+              <input
+                id="auth-password"
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+              />
+            </>
           )}
           {mode === 'signup' && (
-            <input
-              type="password"
-              placeholder="Confirm password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              minLength={6}
-              autoComplete="new-password"
-            />
+            <>
+              <label htmlFor="auth-confirm">Confirm password</label>
+              <input
+                id="auth-confirm"
+                type="password"
+                placeholder="Confirm password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                minLength={6}
+                autoComplete="new-password"
+              />
+            </>
           )}
           {mismatch && <p className="error-text">Passwords don't match.</p>}
           {info && <p>{info}</p>}
-          {error && <p className="error-text">{error}</p>}
+          {error && (
+            <p className="error-text" role="alert">
+              {error}
+            </p>
+          )}
           <button type="submit" className="button button-primary" disabled={submitting || mismatch}>
             {mode === 'signin' ? 'Sign in' : mode === 'signup' ? 'Sign up' : 'Send reset link'}
           </button>
@@ -203,7 +217,9 @@ function RecoveryForm({ onSubmit }) {
       <div className="card auth-card stack">
         <h2>Set a new password</h2>
         <form onSubmit={handleSubmit} className="stack">
+          <label htmlFor="recovery-password">New password</label>
           <input
+            id="recovery-password"
             type="password"
             placeholder="New password"
             value={password}
@@ -213,7 +229,9 @@ function RecoveryForm({ onSubmit }) {
             autoFocus
             autoComplete="new-password"
           />
+          <label htmlFor="recovery-confirm">Confirm new password</label>
           <input
+            id="recovery-confirm"
             type="password"
             placeholder="Confirm new password"
             value={confirmPassword}
@@ -223,7 +241,11 @@ function RecoveryForm({ onSubmit }) {
             autoComplete="new-password"
           />
           {mismatch && <p className="error-text">Passwords don't match.</p>}
-          {error && <p className="error-text">{error}</p>}
+          {error && (
+            <p className="error-text" role="alert">
+              {error}
+            </p>
+          )}
           <button type="submit" className="button button-primary" disabled={submitting || mismatch}>
             Save password
           </button>

@@ -1,9 +1,35 @@
 self.addEventListener('push', (event) => {
-  const data = event.data ? event.data.json() : { title: 'Trigger', body: 'Something happened.' };
-  event.waitUntil(self.registration.showNotification(data.title, { body: data.body }));
+  let data = { title: 'Trigger', body: 'Something happened.', url: '/' };
+  try {
+    if (event.data) data = { ...data, ...event.data.json() };
+  } catch {
+    if (event.data) data.body = event.data.text();
+  }
+  const url = new URL(data.url, self.location.origin);
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: data.tag,
+      data: { url: url.origin === self.location.origin ? url.pathname : '/' },
+    }),
+  );
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  event.waitUntil(clients.openWindow('/'));
+  const target = event.notification.data?.url || '/';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (windows) => {
+      const existing = windows.find(
+        (client) => new URL(client.url).origin === self.location.origin,
+      );
+      if (existing) {
+        await existing.navigate(target);
+        return existing.focus();
+      }
+      return clients.openWindow(target);
+    }),
+  );
 });

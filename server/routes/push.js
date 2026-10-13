@@ -1,26 +1,41 @@
 import { Router } from 'express';
 import { supabase, unwrap } from '../lib/db.js';
 import { sendPush } from '../lib/push.js';
+import { validatePushEndpoint, validatePushSubscription } from '../lib/validation.js';
 
 const router = Router();
 
 router.post('/subscribe', async (req, res, next) => {
   try {
-    const { subscription } = req.body;
-    if (!subscription?.endpoint || !subscription?.keys) {
-      return res.status(400).json({ message: 'A valid push subscription is required.' });
-    }
-
-    unwrap(
-      await supabase.from('push_subscriptions').upsert(
-        {
-          user_id: req.user.id,
-          endpoint: subscription.endpoint,
-          keys: subscription.keys,
-        },
-        { onConflict: 'endpoint' },
-      ),
+    const subscription = validatePushSubscription(req.body?.subscription);
+    const existing = unwrap(
+      await supabase
+        .from('push_subscriptions')
+        .select('user_id,keys')
+        .eq('endpoint', subscription.endpoint)
+        .maybeSingle(),
     );
+    if (
+      existing &&
+      existing.user_id !== req.user.id &&
+      (existing.keys?.p256dh !== subscription.keys.p256dh ||
+        existing.keys?.auth !== subscription.keys.auth)
+    ) {
+      return res.status(409).json({ message: 'This push endpoint is already registered.' });
+    }
+    if (existing) {
+      unwrap(
+        await supabase
+          .from('push_subscriptions')
+          .update({ keys: subscription.keys, user_id: req.user.id })
+          .eq('endpoint', subscription.endpoint)
+          .eq('user_id', existing.user_id),
+      );
+    } else {
+      unwrap(
+        await supabase.from('push_subscriptions').insert({ user_id: req.user.id, ...subscription }),
+      );
+    }
 
     res.status(201).json({ ok: true });
   } catch (error) {
@@ -30,7 +45,7 @@ router.post('/subscribe', async (req, res, next) => {
 
 router.post('/unsubscribe', async (req, res, next) => {
   try {
-    const { endpoint } = req.body;
+    const endpoint = validatePushEndpoint(req.body?.endpoint);
     unwrap(
       await supabase
         .from('push_subscriptions')
@@ -46,8 +61,13 @@ router.post('/unsubscribe', async (req, res, next) => {
 
 router.post('/test', async (req, res, next) => {
   try {
+    const endpoint = validatePushEndpoint(req.body?.endpoint);
     const subs = unwrap(
-      await supabase.from('push_subscriptions').select('*').eq('user_id', req.user.id),
+      await supabase
+        .from('push_subscriptions')
+        .select('*')
+        .eq('user_id', req.user.id)
+        .eq('endpoint', endpoint),
     );
 
     if (!subs.length) {
@@ -70,7 +90,13 @@ router.post('/test', async (req, res, next) => {
       .map((sub) => sub.endpoint);
 
     if (deadEndpoints.length) {
-      await supabase.from('push_subscriptions').delete().in('endpoint', deadEndpoints);
+      unwrap(
+        await supabase
+          .from('push_subscriptions')
+          .delete()
+          .eq('user_id', req.user.id)
+          .in('endpoint', deadEndpoints),
+      );
     }
 
     const delivered = results.filter((r) => r.status === 'fulfilled').length;
