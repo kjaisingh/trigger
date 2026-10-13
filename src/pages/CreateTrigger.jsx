@@ -50,7 +50,7 @@ export default function CreateTrigger() {
       condition: {
         metric: METRICS_BY_DOMAIN[domain]?.[0],
         operator: '>',
-        threshold: 0,
+        threshold: '',
         edge_trigger: false,
       },
       unsupported_reason: null,
@@ -58,12 +58,22 @@ export default function CreateTrigger() {
   }
 
   async function handleCreate() {
+    const threshold = Number(parsed.condition.threshold);
+    if (
+      parsed.domain !== 'unsupported' &&
+      (parsed.condition.threshold === '' || !Number.isFinite(threshold))
+    ) {
+      setError('Enter a valid threshold.');
+      return;
+    }
     setError('');
     setPending('create');
     try {
       await api.post('/api/triggers', {
         raw_prompt: rawPrompt,
         ...parsed,
+        condition:
+          parsed.domain === 'unsupported' ? parsed.condition : { ...parsed.condition, threshold },
         recurring,
         channels: ['push'],
       });
@@ -207,8 +217,7 @@ export default function CreateTrigger() {
                   step="any"
                   value={parsed.condition.threshold}
                   onChange={(e) => {
-                    const value = Number(e.target.value);
-                    updateConditionField('threshold', Number.isNaN(value) ? 0 : value);
+                    updateConditionField('threshold', e.target.value);
                   }}
                 />
               </div>
@@ -237,7 +246,12 @@ export default function CreateTrigger() {
             type="button"
             className="button button-primary"
             onClick={handleCreate}
-            disabled={pending !== null}
+            disabled={
+              pending !== null ||
+              (parsed.domain !== 'unsupported' &&
+                (parsed.condition.threshold === '' ||
+                  !Number.isFinite(Number(parsed.condition.threshold))))
+            }
           >
             {pending === 'create'
               ? 'Creating...'

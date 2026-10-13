@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
-import { describeCondition } from '../lib/summarize.js';
+import { describeCondition, describeSubject } from '../lib/summarize.js';
 
 export default function TriggerDetail() {
   const { id } = useParams();
@@ -106,6 +106,12 @@ export default function TriggerDetail() {
       </div>
 
       <div className="card stack">
+        {trigger.domain !== 'unsupported' && (
+          <div className="row">
+            <span className="label">Watching</span>
+            <span>{describeSubject(trigger.domain, trigger.subject)}</span>
+          </div>
+        )}
         <div className="row">
           <span className="label">Domain</span>
           <span>{trigger.domain}</span>
@@ -122,12 +128,17 @@ export default function TriggerDetail() {
           <span className="label">Recurring</span>
           <span>{trigger.recurring ? 'Yes' : 'No'}</span>
         </div>
-        {trigger.last_checked_at && (
+        {trigger.last_checked_at ? (
           <div className="row">
             <span className="label">Last checked</span>
             <span>{new Date(trigger.last_checked_at).toLocaleString()}</span>
           </div>
-        )}
+        ) : trigger.status === 'active' ? (
+          <div className="row">
+            <span className="label">Last checked</span>
+            <span>Awaiting first check (up to 15 minutes after creation)</span>
+          </div>
+        ) : null}
         {trigger.last_state?.error && (
           <div className="row">
             <span className="label">Last check</span>

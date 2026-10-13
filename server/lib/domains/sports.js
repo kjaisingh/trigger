@@ -1,4 +1,5 @@
 import { fetchWithRetry } from '../http.js';
+import { PublicError } from '../validation.js';
 
 const BASE_URL = `https://www.thesportsdb.com/api/v1/json/${process.env.SPORTSDB_API_KEY || '3'}`;
 
@@ -45,6 +46,12 @@ export async function resolveSubject(subject) {
 
   const teamInfo = await searchTeam(team);
   const opponentInfo = opponent ? await searchTeam(opponent) : null;
+  if (opponentInfo?.id === teamInfo.id) {
+    throw new PublicError('Choose a different opponent team.');
+  }
+  if (opponentInfo && opponentInfo.sport !== teamInfo.sport) {
+    throw new PublicError('Both teams must play the same sport.');
+  }
 
   return {
     teamId: teamInfo.id,

@@ -134,6 +134,7 @@ router.post('/', async (req, res, next) => {
     try {
       resolvedSubject = await resolveSubject(domain, subject);
     } catch (error) {
+      if (error instanceof PublicError) throw error;
       if (error.message.startsWith("Couldn't find")) throw new PublicError(error.message);
       throw error;
     }
@@ -163,7 +164,7 @@ router.post('/', async (req, res, next) => {
 
 router.patch('/:id', async (req, res, next) => {
   try {
-    const { status } = req.body;
+    const status = req.body?.status;
     if (!['active', 'paused'].includes(status)) {
       return res.status(400).json({ message: 'status must be "active" or "paused".' });
     }

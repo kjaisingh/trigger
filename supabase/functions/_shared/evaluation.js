@@ -29,6 +29,7 @@ export function decideFiring(condition, lastState, value, eventId = null) {
 
 function isLiveStatus(event) {
   const status = String(event.strStatus || event.strProgress || '').toLowerCase();
+  if (/final|finish|complete|postpone|cancel|not started|scheduled/.test(status)) return false;
   return /live|in progress|half|quarter|period|inning|^q[1-4]$|^ht$/.test(status);
 }
 
@@ -48,12 +49,7 @@ export function pickLiveEvent(upcoming, recent, teamId, opponentId) {
     (event.idHomeTeam === teamId || event.idAwayTeam === teamId) &&
     (!opponentId || event.idHomeTeam === opponentId || event.idAwayTeam === opponentId);
   return (
-    upcoming.find(
-      (event) =>
-        matches(event) &&
-        scored(event) &&
-        !/final|finish|complete|postpone|cancel/i.test(String(event.strStatus || '')),
-    ) ||
+    upcoming.find((event) => matches(event) && scored(event) && isLiveStatus(event)) ||
     recent.find((event) => matches(event) && scored(event) && isLiveStatus(event)) ||
     null
   );

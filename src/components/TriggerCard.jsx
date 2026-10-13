@@ -15,7 +15,13 @@ export default function TriggerCard({ trigger }) {
         )}
       </div>
       <p className="trigger-prompt">{summarizeTrigger(trigger)}</p>
-      <span className="trigger-date">{new Date(trigger.created_at).toLocaleString()}</span>
+      <span className="trigger-date">
+        {trigger.last_checked_at
+          ? `Last checked ${new Date(trigger.last_checked_at).toLocaleString()}`
+          : trigger.status === 'active'
+            ? 'Awaiting first check'
+            : `Created ${new Date(trigger.created_at).toLocaleString()}`}
+      </span>
     </Link>
   );
 }

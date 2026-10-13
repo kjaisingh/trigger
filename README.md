@@ -15,18 +15,18 @@ Trigger turns a plain-English request into a weather, sports, or crypto alert. Y
 A level trigger fires on each check while its condition is true if recurring is enabled. An edge trigger first records a baseline, then fires only when the condition changes from false to true. A one-time trigger becomes `fired` after its first match. Unsupported requests can be saved for reference, but are not monitored. Push delivery requires an enabled subscription on the device; history records when a condition fired even if no push reached a device.
 
 Sports scores depend on the provider exposing a scored live event. Completed games and fixtures without scores do not fire alerts. Free data sources can rate limit or delay updates. The 15-minute schedule adds up to one polling interval of delay, plus provider and push delivery latency.
-Use a team's full name when editing a sports trigger. Team lookup rejects unrelated fuzzy matches.
+Use a team's full name when editing a sports trigger. Team lookup rejects unrelated fuzzy matches, the same team as its opponent, and teams from different sports.
 
 ## Architecture
 
 - React/Vite client and Express API run together on Render. Supabase Auth handles email/password sign-in; the API checks the user's bearer token.
-- Supabase Postgres stores triggers, events, and push subscriptions. Row level security protects user data; the server and Edge Function use a service role key.
+- Supabase Postgres stores triggers, events, and push subscriptions. Authenticated clients may read their own records through row level security. Validated API routes and the Edge Function write with a service role key.
 - Supabase `pg_cron` and `pg_net` invoke `evaluate-triggers`. This runs independently of the Render web service. Groq parses a prompt once when you create a trigger; evaluation uses deterministic comparisons.
 - Web Push uses a VAPID key pair. The app can be installed from its web manifest. On iPhone, push requires adding the site to the Home Screen.
 
 ## Local setup
 
-1. Install Node.js 22.12 or newer, the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started), and a Supabase project. Run [`supabase/schema.sql`](supabase/schema.sql) in the project's SQL editor. It creates tables, indexes, and RLS policies; run it once for a new project.
+1. Install Node.js 22.12 or newer, the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started), and a Supabase project. Run [`supabase/schema.sql`](supabase/schema.sql) in the project's SQL editor for a new project only. It creates tables, indexes, read-only client grants, and RLS policies. On an existing deployment, apply only new SQL changes; rerunning the full schema would duplicate policies.
 2. Run `npm ci`. Copy `.env.example` to `.env` and fill in Supabase URL and keys, a [Groq API key](https://console.groq.com), and VAPID keys from `npx web-push generate-vapid-keys`. Use the same VAPID public key in `VAPID_PUBLIC_KEY` and `VITE_VAPID_PUBLIC_KEY`. The service role and private VAPID keys must stay server-side.
 3. Run `npm run dev`. Open `http://localhost:5173`; the API runs at `http://localhost:3001`. `CLIENT_URL` allows the local Vite origin; `VITE_API_URL` points the client to the local API. Supabase's scheduled evaluator is separate, so creating a trigger locally does not start local polling.
 4. In the app, sign up, create a trigger, then enable push in Settings. Browser push needs HTTPS or localhost and browser permission.
@@ -43,6 +43,12 @@ Use a team's full name when editing a sports trigger. Team lookup rejects unrela
 
 3. Edit the commented `cron.schedule` block at the end of [`supabase/schema.sql`](supabase/schema.sql): enter the project ref, service role key, and the same cron secret, then run that block in the Supabase SQL editor. Keep these credentials out of Git. It schedules a check every 15 minutes.
 4. Check `/api/health`, sign in, send a test notification from Settings, and inspect a trigger's Last checked and History fields after a scheduled run. Render deployment does **not** deploy the Supabase function or SQL; repeat function deployment after changing its code.
+
+### Existing Trigger deployment
+
+The hosted app is at [trigger-rhji.onrender.com](https://trigger-rhji.onrender.com) and uses Supabase project `lzjdswxkdlmmajmsurwt`. Its `evaluate-triggers` cron job was active on a `*/15 * * * *` schedule on 2026-10-13. A disposable weather trigger received its first check at 19:00 UTC, then was deleted. The GitHub Supabase activity workflow passed a manual run for this project. Recheck these services after changing project credentials or deploying a new Supabase project.
+
+For this existing project, use the app directly. You do not need to rerun the full schema or recreate the Render service. To receive alerts, sign in and enable notifications in Settings on each browser or device you want to use, then send a test notification. Check the trigger's Last checked field after the next scheduled run. Confirm your Supabase Auth Site URL and allowed redirect URLs include the hosted origin and its `/auth` password-reset route.
 
 ## Free Supabase project activity
 

@@ -53,39 +53,35 @@ export default function AuthPage() {
     setInfo('');
     setSubmitting(true);
 
-    if (mode === 'forgot') {
-      const { error } = await resetPassword(email);
-      setSubmitting(false);
-      if (error) {
-        setError(error.message);
+    try {
+      if (mode === 'forgot') {
+        const { error } = await resetPassword(email);
+        if (error) throw error;
+        setInfo('Check your email for a link to reset your password.');
         return;
       }
-      setInfo('Check your email for a link to reset your password.');
-      return;
-    }
 
-    if (mode === 'signup' && password !== confirmPassword) {
+      if (mode === 'signup' && password !== confirmPassword) {
+        setError('Passwords do not match.');
+        return;
+      }
+
+      const { data, error } =
+        mode === 'signin' ? await signIn(email, password) : await signUp(email, password);
+      if (error) throw error;
+
+      if (mode === 'signup' && !data.session) {
+        setInfo('Check your email to confirm your account, then sign in.');
+        setMode('signin');
+        return;
+      }
+
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err.message || 'Authentication failed. Please try again.');
+    } finally {
       setSubmitting(false);
-      setError('Passwords do not match.');
-      return;
     }
-
-    const { data, error } =
-      mode === 'signin' ? await signIn(email, password) : await signUp(email, password);
-
-    setSubmitting(false);
-    if (error) {
-      setError(error.message);
-      return;
-    }
-
-    if (mode === 'signup' && !data.session) {
-      setInfo('Check your email to confirm your account, then sign in.');
-      setMode('signin');
-      return;
-    }
-
-    navigate('/dashboard');
   }
 
   function switchMode(next) {
@@ -152,7 +148,7 @@ export default function AuthPage() {
             </>
           )}
           {mismatch && <p className="error-text">Passwords don't match.</p>}
-          {info && <p>{info}</p>}
+          {info && <p role="status">{info}</p>}
           {error && (
             <p className="error-text" role="alert">
               {error}

@@ -32,3 +32,19 @@ test('sports ignores completed games and unscored fixtures', () => {
   recent[0].strStatus = 'Live';
   assert.equal(pickLiveEvent(upcoming, recent, 'a', 'b')?.idEvent, 'past');
 });
+
+test('sports ignores future fixtures with placeholder scores', () => {
+  const future = {
+    idEvent: 'future',
+    idHomeTeam: 'a',
+    idAwayTeam: 'b',
+    intHomeScore: '0',
+    intAwayScore: '0',
+    strStatus: 'Not Started',
+  };
+  assert.equal(pickLiveEvent([future], [], 'a', 'b'), null);
+  future.strStatus = 'Live';
+  assert.equal(pickLiveEvent([future], [], 'a', 'b')?.idEvent, 'future');
+  future.strStatus = 'Final after 2nd Half';
+  assert.equal(pickLiveEvent([future], [], 'a', 'b'), null);
+});

@@ -138,16 +138,18 @@ async function evaluateTrigger(trigger: any) {
     else if (domain === 'crypto') result = await evaluateCrypto(subject, condition);
     else return;
   } catch (error) {
-    checked(
-      await supabase
-        .from('triggers')
-        .update({
-          last_checked_at: new Date().toISOString(),
-          last_state: { ...(trigger.last_state || {}), error: String(error) },
-        })
-        .eq('id', trigger.id)
-        .eq('status', 'active'),
-    );
+    let update = supabase
+      .from('triggers')
+      .update({
+        last_checked_at: new Date().toISOString(),
+        last_state: { ...(trigger.last_state || {}), error: String(error) },
+      })
+      .eq('id', trigger.id)
+      .eq('status', 'active');
+    update = trigger.last_checked_at
+      ? update.eq('last_checked_at', trigger.last_checked_at)
+      : update.is('last_checked_at', null);
+    checked(await update);
     throw error;
   }
 
@@ -240,24 +242,38 @@ async function evaluateTrigger(trigger: any) {
 }
 
 Deno.serve(async (req) => {
+  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
   const secret = req.headers.get('x-cron-secret');
   if (secret !== Deno.env.get('CRON_SHARED_SECRET')) {
     return new Response('Unauthorized', { status: 401 });
   }
 
-  const { data: triggers, error } = await supabase
-    .from('triggers')
-    .select('*')
-    .eq('status', 'active');
-  if (error) {
-    return new Response(error.message, { status: 500 });
+  let cursor = '';
+  let evaluated = 0;
+  let failed = 0;
+  while (true) {
+    let query = supabase.from('triggers').select('*').eq('status', 'active').order('id').limit(100);
+    if (cursor) query = query.gt('id', cursor);
+    const { data: triggers, error } = await query;
+    if (error) return new Response(error.message, { status: 500 });
+    if (!triggers?.length) break;
+    cursor = triggers[triggers.length - 1].id;
+    evaluated += triggers.length;
+    for (let offset = 0; offset < triggers.length; offset += 8) {
+      const results = await Promise.allSettled(
+        triggers.slice(offset, offset + 8).map(evaluateTrigger),
+      );
+      for (const result of results) {
+        if (result.status === 'rejected') {
+          failed += 1;
+          console.error('Trigger evaluation failed:', result.reason);
+        }
+      }
+    }
+    if (triggers.length < 100) break;
   }
 
-  const results = await Promise.allSettled((triggers || []).map(evaluateTrigger));
-  const failed = results.filter((r) => r.status === 'rejected');
-  failed.forEach((r: any) => console.error('Trigger evaluation failed:', r.reason));
-
-  return new Response(JSON.stringify({ evaluated: triggers?.length || 0, failed: failed.length }), {
+  return new Response(JSON.stringify({ evaluated, failed }), {
     headers: { 'Content-Type': 'application/json' },
   });
 });

@@ -46,6 +46,9 @@ alter table triggers enable row level security;
 alter table trigger_events enable row level security;
 alter table push_subscriptions enable row level security;
 
+-- Client access is read-only; the API and evaluator write with the service role.
+revoke insert, update, delete on triggers, trigger_events, push_subscriptions from anon, authenticated;
+
 create policy "triggers_owner_all" on triggers
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 

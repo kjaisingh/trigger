@@ -40,9 +40,22 @@ export default function Dashboard() {
           <h2>Your triggers</h2>
           <p className="muted">Manage conditions and review recent checks.</p>
         </div>
-        <Link to="/create" className="button button-primary">
-          New trigger
-        </Link>
+        <div className="row page-actions">
+          <button
+            type="button"
+            className="button"
+            onClick={() => {
+              setError('');
+              setTriggers(null);
+              setReloadKey((key) => key + 1);
+            }}
+          >
+            Refresh
+          </button>
+          <Link to="/create" className="button button-primary">
+            New trigger
+          </Link>
+        </div>
       </div>
       {error ? (
         <div className="empty-state" role="alert">

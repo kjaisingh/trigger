@@ -32,7 +32,12 @@ function formatThreshold(metric, threshold) {
 }
 
 export function describeSubject(domain, subject) {
-  if (domain === 'weather') return subject.location || 'your location';
+  if (domain === 'weather') {
+    return (
+      [subject.location, subject.admin1, subject.country].filter(Boolean).join(', ') ||
+      'your location'
+    );
+  }
   if (domain === 'sports') {
     const team = subject.teamName || subject.team;
     const opponent = subject.opponentName || subject.opponent;
