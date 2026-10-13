@@ -46,7 +46,7 @@ Sports scores depend on the provider exposing a scored live event. Completed gam
 ## Configuration
 
 [`.env.example`](.env.example) lists local variables. Render's Blueprint lists deployed web-service variables. `SUPABASE_SERVICE_ROLE_KEY`, `GROQ_API_KEY`, and `VAPID_PRIVATE_KEY` are secrets. `VITE_SUPABASE_ANON_KEY` and `VITE_VAPID_PUBLIC_KEY` are intentionally public. The Edge Function additionally needs `CRON_SHARED_SECRET` (not the Render service). `SPORTSDB_API_KEY` defaults to the free test key `3`.
-`GROQ_MODEL` is optional and defaults to `llama-3.1-8b-instant`; choose a model available to your Groq account if it changes.
+`GROQ_MODEL` is optional and defaults to `openai/gpt-oss-20b`; choose a model available to your Groq account if it changes.
 
 ## Checks
 

@@ -2,7 +2,7 @@ import { fetchWithRetry } from './http.js';
 import { PublicError } from './validation.js';
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const MODEL = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
+const MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
 
 const SYSTEM_PROMPT = `You turn a user's natural-language alert request into a structured trigger definition.
 
