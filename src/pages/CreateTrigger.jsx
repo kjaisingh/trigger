@@ -150,7 +150,11 @@ export default function CreateTrigger() {
               </div>
               <div className="row">
                 <span className="label">Fires when</span>
-                <span>{describeCondition(parsed.condition)}</span>
+                <span>
+                  {parsed.condition.threshold === ''
+                    ? 'Enter a threshold below.'
+                    : describeCondition(parsed.condition)}
+                </span>
               </div>
 
               {parsed.domain === 'weather' && (
