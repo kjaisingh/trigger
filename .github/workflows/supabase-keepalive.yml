@@ -1,0 +1,46 @@
+name: Supabase activity
+
+on:
+  schedule:
+    - cron: '17 4,12,20 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  read-database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      SUPABASE_URL: ${{ vars.SUPABASE_KEEPALIVE_URL }}
+      SUPABASE_TABLE: ${{ vars.SUPABASE_KEEPALIVE_TABLE }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_KEEPALIVE_ANON_KEY }}
+    steps:
+      - name: Make a read-only database request
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$SUPABASE_URL" =~ ^https://[a-z0-9]+\.supabase\.co/?$ ]] || {
+            echo 'Set SUPABASE_KEEPALIVE_URL to the intended project URL.' >&2
+            exit 1
+          }
+          [[ "$SUPABASE_TABLE" =~ ^[a-z][a-z0-9_]*$ ]] || {
+            echo 'Set SUPABASE_KEEPALIVE_TABLE to a readable table with an id column.' >&2
+            exit 1
+          }
+          [[ -n "$SUPABASE_ANON_KEY" ]] || {
+            echo 'Set the SUPABASE_KEEPALIVE_ANON_KEY repository secret.' >&2
+            exit 1
+          }
+
+          status=$(curl --silent --show-error --fail \
+            --connect-timeout 10 --max-time 30 --retry 2 --retry-delay 5 \
+            --output /dev/null --write-out '%{http_code}' \
+            --header "apikey: $SUPABASE_ANON_KEY" \
+            --header "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            "${SUPABASE_URL%/}/rest/v1/${SUPABASE_TABLE}?select=id&limit=1")
+          [[ "$status" == '200' ]] || {
+            echo "Database request returned HTTP $status." >&2
+            exit 1
+          }
+          echo 'Supabase database read succeeded (HTTP 200).'

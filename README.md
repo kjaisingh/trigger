@@ -44,6 +44,23 @@ Use a team's full name when editing a sports trigger. Team lookup rejects unrela
 3. Edit the commented `cron.schedule` block at the end of [`supabase/schema.sql`](supabase/schema.sql): enter the project ref, service role key, and the same cron secret, then run that block in the Supabase SQL editor. Keep these credentials out of Git. It schedules a check every 15 minutes.
 4. Check `/api/health`, sign in, send a test notification from Settings, and inspect a trigger's Last checked and History fields after a scheduled run. Render deployment does **not** deploy the Supabase function or SQL; repeat function deployment after changing its code.
 
+## Free Supabase project activity
+
+Supabase may pause a Free project after seven days of low database activity. The [Supabase activity workflow](.github/workflows/supabase-keepalive.yml) makes a small, read-only database request three times a day (04:17, 12:17, and 20:17 UTC). It reduces the risk of an inactivity pause; [Supabase does not guarantee that Free projects stay active](https://supabase.com/docs/guides/platform/free-project-pausing).
+
+Configure the workflow for the **project you want to keep active**. For Trigger, use its Supabase URL and the `triggers` table. The anonymous role can query that table, but row level security returns no user records. Use the project's **anon** API key, never its service role key.
+
+```bash
+gh variable set SUPABASE_KEEPALIVE_URL --body https://YOUR_PROJECT_REF.supabase.co
+gh variable set SUPABASE_KEEPALIVE_TABLE --body triggers
+gh secret set SUPABASE_KEEPALIVE_ANON_KEY
+gh workflow run supabase-keepalive.yml
+```
+
+Enter the anon key when `gh secret set` prompts. Check the dispatched run under GitHub Actions; it must report HTTP 200. If you target another Supabase project, choose a table with an `id` column that the anon role can read without exposing private rows. A paused project must be resumed once before requests can succeed.
+
+GitHub [automatically disables scheduled workflows in public repositories after 60 days without repository activity](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-workflow-runs/disabling-and-enabling-a-workflow). For long-term scheduling independent of repository activity, create a free [cron-job.org](https://cron-job.org/en/) job with the same three daily times. Set its method to `GET`, URL to `https://YOUR_PROJECT_REF.supabase.co/rest/v1/YOUR_TABLE?select=id&limit=1`, and headers `apikey: YOUR_ANON_KEY` and `Authorization: Bearer YOUR_ANON_KEY`. Enable failure notifications and run a test; expect HTTP 200. Use the same project and RLS-protected table as the GitHub workflow. The GitHub workflow remains available for manual checks.
+
 ## Configuration
 
 [`.env.example`](.env.example) lists local variables. Render's Blueprint lists deployed web-service variables. `SUPABASE_SERVICE_ROLE_KEY`, `GROQ_API_KEY`, and `VAPID_PRIVATE_KEY` are secrets. `VITE_SUPABASE_ANON_KEY` and `VITE_VAPID_PUBLIC_KEY` are intentionally public. The Edge Function additionally needs `CRON_SHARED_SECRET` (not the Render service). `SPORTSDB_API_KEY` defaults to the free test key `3`.
