@@ -11,7 +11,13 @@ import NotFound from './pages/NotFound.jsx';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
-  if (loading) return null;
+  if (loading) {
+    return (
+      <p className="empty-state" role="status">
+        Loading your session...
+      </p>
+    );
+  }
   if (!user) return <Navigate to="/auth" replace />;
   return children;
 }

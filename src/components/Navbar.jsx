@@ -3,14 +3,21 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 
 export default function Navbar() {
-  const { user, signOut } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [signOutError, setSignOutError] = useState('');
 
   async function handleSignOut() {
-    setMenuOpen(false);
-    await signOut();
-    navigate('/');
+    setSignOutError('');
+    try {
+      const { error } = await signOut();
+      if (error) throw error;
+      setMenuOpen(false);
+      navigate('/');
+    } catch (error) {
+      setSignOutError(error.message || 'Could not sign out. Please try again.');
+    }
   }
 
   function closeMenu() {
@@ -47,7 +54,7 @@ export default function Navbar() {
         aria-label="Main navigation"
         className={`nav-links ${menuOpen ? 'is-open' : ''}`}
       >
-        {user ? (
+        {loading ? null : user ? (
           <>
             <Link to="/dashboard" onClick={closeMenu}>
               Dashboard
@@ -58,6 +65,11 @@ export default function Navbar() {
             <button className="link-button" onClick={handleSignOut}>
               Sign out
             </button>
+            {signOutError && (
+              <p className="error-text" role="alert">
+                {signOutError}
+              </p>
+            )}
           </>
         ) : (
           <Link to="/auth" onClick={closeMenu}>

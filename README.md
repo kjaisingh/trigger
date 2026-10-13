@@ -46,7 +46,7 @@ Use a team's full name when editing a sports trigger. Team lookup rejects unrela
 
 ### Existing Trigger deployment
 
-The hosted app is at [trigger-rhji.onrender.com](https://trigger-rhji.onrender.com) and uses Supabase project `lzjdswxkdlmmajmsurwt`. Its `evaluate-triggers` cron job was active on a `*/15 * * * *` schedule on 2026-10-13. A disposable weather trigger received its first check at 19:00 UTC, then was deleted. The GitHub Supabase activity workflow passed a manual run for this project. Recheck these services after changing project credentials or deploying a new Supabase project.
+The hosted app is at [trigger-rhji.onrender.com](https://trigger-rhji.onrender.com) and uses Supabase project `lzjdswxkdlmmajmsurwt`. Its `evaluate-triggers` cron job was active on a `*/15 * * * *` schedule on 2026-10-13. A disposable weather trigger received its first check at 19:00 UTC, then was deleted. Direct client write grants were revoked on the existing database, and the GitHub Supabase activity workflow passed a manual run. Recheck these services after changing project credentials or deploying a new Supabase project.
 
 For this existing project, use the app directly. You do not need to rerun the full schema or recreate the Render service. To receive alerts, sign in and enable notifications in Settings on each browser or device you want to use, then send a test notification. Check the trigger's Last checked field after the next scheduled run. Confirm your Supabase Auth Site URL and allowed redirect URLs include the hosted origin and its `/auth` password-reset route.
 
