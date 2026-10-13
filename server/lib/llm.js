@@ -52,7 +52,14 @@ export async function parsePrompt(rawPrompt) {
   });
 
   if (!res.ok) {
-    throw new Error(`Groq request failed (${res.status}).`);
+    const detail = await res.json().catch(() => null);
+    console.error('Groq request failed', {
+      status: res.status,
+      code: detail?.error?.code,
+      type: detail?.error?.type,
+      message: detail?.error?.message?.slice(0, 300),
+    });
+    throw new PublicError('Prompt parsing is unavailable right now. Try again later.', 502);
   }
 
   const data = await res.json();
