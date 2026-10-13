@@ -587,6 +587,10 @@ textarea:focus {
 }
 
 @media (max-width: 480px) {
+  .condition-row select:first-child {
+    flex-basis: 100%;
+  }
+
   .hero-steps {
     grid-template-columns: 1fr;
   }

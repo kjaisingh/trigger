@@ -15,6 +15,7 @@ Trigger turns a plain-English request into a weather, sports, or crypto alert. Y
 A level trigger fires on each check while its condition is true if recurring is enabled. An edge trigger first records a baseline, then fires only when the condition changes from false to true. A one-time trigger becomes `fired` after its first match. Unsupported requests can be saved for reference, but are not monitored. Push delivery requires an enabled subscription on the device; history records when a condition fired even if no push reached a device.
 
 Sports scores depend on the provider exposing a scored live event. Completed games and fixtures without scores do not fire alerts. Free data sources can rate limit or delay updates. The 15-minute schedule adds up to one polling interval of delay, plus provider and push delivery latency.
+Use a team's full name when editing a sports trigger. Team lookup rejects unrelated fuzzy matches.
 
 ## Architecture
 

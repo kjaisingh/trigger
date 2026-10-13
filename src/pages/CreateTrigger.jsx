@@ -16,7 +16,7 @@ export default function CreateTrigger() {
   const [rawPrompt, setRawPrompt] = useState('');
   const [parsed, setParsed] = useState(null);
   const [recurring, setRecurring] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [pending, setPending] = useState(null);
   const [error, setError] = useState('');
   const promptVersion = useRef(0);
 
@@ -24,14 +24,14 @@ export default function CreateTrigger() {
     e.preventDefault();
     const version = promptVersion.current;
     setError('');
-    setLoading(true);
+    setPending('parse');
     try {
       const result = await api.post('/api/triggers/parse', { raw_prompt: rawPrompt });
       if (version === promptVersion.current) setParsed(result);
     } catch (err) {
       if (version === promptVersion.current) setError(err.message);
     } finally {
-      setLoading(false);
+      setPending(null);
     }
   }
 
@@ -59,7 +59,7 @@ export default function CreateTrigger() {
 
   async function handleCreate() {
     setError('');
-    setLoading(true);
+    setPending('create');
     try {
       await api.post('/api/triggers', {
         raw_prompt: rawPrompt,
@@ -71,7 +71,7 @@ export default function CreateTrigger() {
     } catch (err) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      setPending(null);
     }
   }
 
@@ -100,9 +100,9 @@ export default function CreateTrigger() {
         <button
           type="submit"
           className="button button-primary"
-          disabled={loading || !rawPrompt.trim()}
+          disabled={pending !== null || !rawPrompt.trim()}
         >
-          {loading ? 'Interpreting...' : 'Continue'}
+          {pending === 'parse' ? 'Interpreting...' : 'Continue'}
         </button>
       </form>
 
@@ -237,9 +237,13 @@ export default function CreateTrigger() {
             type="button"
             className="button button-primary"
             onClick={handleCreate}
-            disabled={loading}
+            disabled={pending !== null}
           >
-            {parsed.domain === 'unsupported' ? 'Save anyway' : 'Create trigger'}
+            {pending === 'create'
+              ? 'Creating...'
+              : parsed.domain === 'unsupported'
+                ? 'Save anyway'
+                : 'Create trigger'}
           </button>
         </div>
       )}

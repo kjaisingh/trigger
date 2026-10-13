@@ -11,10 +11,22 @@ async function searchTeam(name) {
     throw new Error(`TheSportsDB lookup failed (${res.status}). Try again in a moment.`);
   }
   const data = await res.json();
-  const match = data.teams?.[0];
+  const normalize = (value) =>
+    value
+      .toLowerCase()
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  const wanted = normalize(name);
+  const match = data.teams?.find((team) =>
+    [team.strTeam, ...(team.strAlternate || '').split(',')].some(
+      (candidate) => candidate && normalize(candidate) === wanted,
+    ),
+  );
 
   if (!match) {
-    throw new Error(`Couldn't find a team matching "${name}".`);
+    throw new Error(`Couldn't find an exact team matching "${name}". Use its full name.`);
   }
 
   return {
