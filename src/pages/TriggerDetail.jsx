@@ -4,6 +4,7 @@ import { api } from '../lib/api.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 import { describeCondition, describeSubject } from '../lib/summarize.js';
+import { checkHealth } from '../lib/checkHealth.js';
 
 export default function TriggerDetail() {
   const { id } = useParams();
@@ -92,6 +93,7 @@ export default function TriggerDetail() {
   }
 
   const canToggle = trigger.status === 'active' || trigger.status === 'paused';
+  const health = checkHealth(trigger);
 
   return (
     <div className="stack">
@@ -136,9 +138,15 @@ export default function TriggerDetail() {
         ) : trigger.status === 'active' ? (
           <div className="row">
             <span className="label">Last checked</span>
-            <span>Awaiting first check (up to 15 minutes after creation)</span>
+            <span>{health?.label}</span>
           </div>
         ) : null}
+        {health && trigger.last_checked_at && (
+          <div className="row">
+            <span className="label">Schedule</span>
+            <span className={health.delayed ? 'warn-text' : ''}>{health.label}</span>
+          </div>
+        )}
         {trigger.last_state?.error && (
           <div className="row">
             <span className="label">Last check</span>
@@ -154,6 +162,16 @@ export default function TriggerDetail() {
       </div>
 
       <div className="row">
+        <button
+          type="button"
+          className="button"
+          onClick={() => {
+            setLoadError('');
+            setReloadKey((key) => key + 1);
+          }}
+        >
+          Refresh
+        </button>
         {canToggle && (
           <button className="button" onClick={toggleStatus} disabled={togglingStatus}>
             {togglingStatus ? 'Updating...' : trigger.status === 'paused' ? 'Resume' : 'Pause'}
@@ -169,7 +187,7 @@ export default function TriggerDetail() {
         </button>
       </div>
 
-      <h3>History</h3>
+      <h3>History (latest 100)</h3>
       {events.length === 0 ? (
         <p className="empty-state">No alerts fired yet.</p>
       ) : (

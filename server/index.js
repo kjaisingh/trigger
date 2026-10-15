@@ -7,13 +7,25 @@ import cors from 'cors';
 import { requireAuth } from './lib/auth.js';
 import triggerRoutes from './routes/triggers.js';
 import pushRoutes from './routes/push.js';
+import { databaseReady } from './lib/readiness.js';
+import { supabase } from './lib/db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
+app.disable('x-powered-by');
 
 app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
 app.use(express.json({ limit: '16kb' }));
-app.get('/api/health', (_req, res) => res.json({ ok: true }));
+app.get('/api/health', (_req, res) => {
+  res.set('Cache-Control', 'no-store').json({ ok: true });
+});
+app.get('/api/ready', async (_req, res) => {
+  const ready = await databaseReady(supabase);
+  res
+    .set('Cache-Control', 'no-store')
+    .status(ready ? 200 : 503)
+    .json({ ok: ready });
+});
 
 app.use('/api/triggers', requireAuth, triggerRoutes);
 app.use('/api/push', requireAuth, pushRoutes);

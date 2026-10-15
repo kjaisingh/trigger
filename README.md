@@ -26,7 +26,7 @@ Use a team's full name when editing a sports trigger. Team lookup rejects unrela
 
 ## Local setup
 
-1. Install Node.js 22.12 or newer, the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started), and a Supabase project. Run [`supabase/schema.sql`](supabase/schema.sql) in the project's SQL editor for a new project only. It creates tables, indexes, read-only client grants, and RLS policies. On an existing deployment, apply only new SQL changes; rerunning the full schema would duplicate policies.
+1. Install Node.js 22.12 or newer, the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started), and a Supabase project. Run [`supabase/schema.sql`](supabase/schema.sql) in the project's SQL editor for a new project only. It creates tables, indexes, read-only client grants, and RLS policies. On an existing deployment, apply the relevant file in [`supabase/migrations`](supabase/migrations); rerunning the full schema would duplicate policies.
 2. Run `npm ci`. Copy `.env.example` to `.env` and fill in Supabase URL and keys, a [Groq API key](https://console.groq.com), and VAPID keys from `npx web-push generate-vapid-keys`. Use the same VAPID public key in `VAPID_PUBLIC_KEY` and `VITE_VAPID_PUBLIC_KEY`. The service role and private VAPID keys must stay server-side.
 3. Run `npm run dev`. Open `http://localhost:5173`; the API runs at `http://localhost:3001`. `CLIENT_URL` allows the local Vite origin; `VITE_API_URL` points the client to the local API. Supabase's scheduled evaluator is separate, so creating a trigger locally does not start local polling.
 4. In the app, sign up, create a trigger, then enable push in Settings. Browser push needs HTTPS or localhost and browser permission.
@@ -42,23 +42,31 @@ Use a team's full name when editing a sports trigger. Team lookup rejects unrela
    ```
 
 3. Edit the commented `cron.schedule` block at the end of [`supabase/schema.sql`](supabase/schema.sql): enter the project ref, service role key, and the same cron secret, then run that block in the Supabase SQL editor. Keep these credentials out of Git. It schedules a check every 15 minutes.
-4. Check `/api/health`, sign in, send a test notification from Settings, and inspect a trigger's Last checked and History fields after a scheduled run. Render deployment does **not** deploy the Supabase function or SQL; repeat function deployment after changing its code.
+4. Check `/api/health` for web-process liveness and `/api/ready` for database reachability. Sign in, send a test notification from Settings, and inspect a trigger's Last checked and History fields after a scheduled run. Render deployment does **not** deploy the Supabase function or SQL; repeat function deployment after changing its code.
 
 ### Existing Trigger deployment
 
-The hosted app is at [trigger-rhji.onrender.com](https://trigger-rhji.onrender.com) and uses Supabase project `lzjdswxkdlmmajmsurwt`. Its `evaluate-triggers` cron job was active on a `*/15 * * * *` schedule on 2026-10-13. A disposable weather trigger received its first check at 19:00 UTC, then was deleted. Direct client write grants were revoked on the existing database, and the GitHub Supabase activity workflow passed a manual run. Recheck these services after changing project credentials or deploying a new Supabase project.
+The hosted app is at [trigger-rhji.onrender.com](https://trigger-rhji.onrender.com) and uses Supabase project `lzjdswxkdlmmajmsurwt`. Its `evaluate-triggers` cron job was active on a `*/15 * * * *` schedule on 2026-10-15. The database migration [`20261015_read_only_clients.sql`](supabase/migrations/20261015_read_only_clients.sql) was applied: clients have SELECT-only access, while the API and evaluator retain service-role writes. The scheduled GitHub activity workflow has passed repeated runs. Recheck these services after changing project credentials or deploying a new Supabase project.
 
-For this existing project, use the app directly. You do not need to rerun the full schema or recreate the Render service. To receive alerts, sign in and enable notifications in Settings on each browser or device you want to use, then send a test notification. Check the trigger's Last checked field after the next scheduled run. Confirm your Supabase Auth Site URL and allowed redirect URLs include the hosted origin and its `/auth` password-reset route.
+For this existing project, use the app directly. You do not need to rerun the full schema or recreate the Render service. To receive alerts, sign in and enable notifications in Settings on each browser or device you want to use, then send a test notification. Check the trigger's Last checked field after the next scheduled run; active checks show a delay warning after 30 minutes without a check. Confirm your Supabase Auth Site URL and allowed redirect URLs include the hosted origin and its `/auth` password-reset route. Trigger details display the latest 100 history events; older events remain in Postgres.
+
+### Owner checklist
+
+1. Open the hosted app, sign in, and create a trigger. After the next scheduled run, confirm its Last checked time advances. Use Refresh on the detail page to load the latest state.
+2. On each device you want alerted, enable notifications in Settings and send a test notification. Browser permission and delivery must be checked on that device.
+3. Keep an offsite database export if losing alert history would matter. Supabase Free does not include guaranteed uptime or a managed backup policy for this app. See [database recovery](#database-recovery).
+4. Optionally configure an independent free cron-job.org check below for long-term activity when this public GitHub repository has no commits for 60 days.
 
 ## Free Supabase project activity
 
-Supabase may pause a Free project after seven days of low database activity. The [Supabase activity workflow](.github/workflows/supabase-keepalive.yml) makes a small, read-only database request three times a day (04:17, 12:17, and 20:17 UTC). It reduces the risk of an inactivity pause; [Supabase does not guarantee that Free projects stay active](https://supabase.com/docs/guides/platform/free-project-pausing).
+Supabase may pause a Free project after seven days of low database activity. The [Supabase activity workflow](.github/workflows/supabase-keepalive.yml) makes a small, read-only database request three times a day (04:17, 12:17, and 20:17 UTC), then checks the hosted `/api/ready` endpoint. It reduces the risk of an inactivity pause and detects an unavailable app or database; [Supabase does not guarantee that Free projects stay active](https://supabase.com/docs/guides/platform/free-project-pausing). This is a best-effort activity and monitoring setup, not a database backup.
 
 Configure the workflow for the **project you want to keep active**. For Trigger, use its Supabase URL and the `triggers` table. The anonymous role can query that table, but row level security returns no user records. Use the project's **anon** API key, never its service role key.
 
 ```bash
 gh variable set SUPABASE_KEEPALIVE_URL --body https://YOUR_PROJECT_REF.supabase.co
 gh variable set SUPABASE_KEEPALIVE_TABLE --body triggers
+gh variable set TRIGGER_READY_URL --body https://trigger-rhji.onrender.com/api/ready
 gh secret set SUPABASE_KEEPALIVE_ANON_KEY
 gh workflow run supabase-keepalive.yml
 ```
@@ -66,6 +74,10 @@ gh workflow run supabase-keepalive.yml
 Enter the anon key when `gh secret set` prompts. Check the dispatched run under GitHub Actions; it must report HTTP 200. If you target another Supabase project, choose a table with an `id` column that the anon role can read without exposing private rows. A paused project must be resumed once before requests can succeed.
 
 GitHub [automatically disables scheduled workflows in public repositories after 60 days without repository activity](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-workflow-runs/disabling-and-enabling-a-workflow). For long-term scheduling independent of repository activity, create a free [cron-job.org](https://cron-job.org/en/) job with the same three daily times. Set its method to `GET`, URL to `https://YOUR_PROJECT_REF.supabase.co/rest/v1/YOUR_TABLE?select=id&limit=1`, and headers `apikey: YOUR_ANON_KEY` and `Authorization: Bearer YOUR_ANON_KEY`. Enable failure notifications and run a test; expect HTTP 200. Use the same project and RLS-protected table as the GitHub workflow. The GitHub workflow remains available for manual checks.
+
+## Database recovery
+
+The app stores data in hosted Supabase Postgres, so Render restarts do not erase triggers or history. The activity workflow and cron reduce idle pauses but cannot guarantee Free-tier availability. If the project pauses, resume it in the Supabase dashboard, check `/api/ready`, then verify the `evaluate-triggers` cron job and a trigger's Last checked time. If Supabase reports the project can no longer be restored, use its dashboard export/download option for the remaining data. For your own offsite copy while the project is active, follow [Supabase's database backup/export guide](https://supabase.com/docs/guides/platform/backups) and store the export outside this public repository. Exports can contain account identifiers and push subscription keys.
 
 ## Configuration
 
@@ -84,7 +96,7 @@ npm run build
 deno check supabase/functions/evaluate-triggers/index.ts
 ```
 
-GitHub Actions runs these checks on pushes and pull requests to `main`. Dependabot proposes weekly npm and Actions updates. `npm run format` writes Prettier changes. The API's unauthenticated health check is `/api/health`.
+GitHub Actions runs these checks on pushes and pull requests to `main`. Dependabot proposes weekly npm and Actions updates. `npm run format` writes Prettier changes. `/api/health` checks the web process; `/api/ready` makes a bounded database query and returns 503 when Supabase is unavailable.
 
 ## Current limits
 

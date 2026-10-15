@@ -15,6 +15,7 @@ jobs:
       SUPABASE_URL: ${{ vars.SUPABASE_KEEPALIVE_URL }}
       SUPABASE_TABLE: ${{ vars.SUPABASE_KEEPALIVE_TABLE }}
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_KEEPALIVE_ANON_KEY }}
+      APP_READY_URL: ${{ vars.TRIGGER_READY_URL }}
     steps:
       - name: Make a read-only database request
         shell: bash
@@ -44,3 +45,19 @@ jobs:
             exit 1
           }
           echo 'Supabase database read succeeded (HTTP 200).'
+      - name: Check hosted app and database readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$APP_READY_URL" =~ ^https://[a-zA-Z0-9.-]+/api/ready$ ]] || {
+            echo 'Set TRIGGER_READY_URL to the hosted /api/ready endpoint.' >&2
+            exit 1
+          }
+          status=$(curl --silent --show-error \
+            --connect-timeout 10 --max-time 60 --retry 2 --retry-delay 5 \
+            --output /dev/null --write-out '%{http_code}' "$APP_READY_URL")
+          [[ "$status" == '200' ]] || {
+            echo "Hosted readiness returned HTTP $status." >&2
+            exit 1
+          }
+          echo 'Hosted app and database are ready (HTTP 200).'

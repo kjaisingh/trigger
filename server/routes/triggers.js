@@ -96,7 +96,8 @@ router.get('/:id', async (req, res, next) => {
         .from('trigger_events')
         .select('*')
         .eq('trigger_id', req.params.id)
-        .order('fired_at', { ascending: false }),
+        .order('fired_at', { ascending: false })
+        .limit(100),
     );
 
     res.json({ ...trigger, events });

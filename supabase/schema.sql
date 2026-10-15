@@ -37,28 +37,30 @@ create table if not exists push_subscriptions (
   created_at timestamptz not null default now()
 );
 
-create index if not exists triggers_user_id_idx on triggers(user_id);
-create index if not exists triggers_status_idx on triggers(status);
-create index if not exists trigger_events_trigger_id_idx on trigger_events(trigger_id);
 create index if not exists push_subscriptions_user_id_idx on push_subscriptions(user_id);
+create index if not exists triggers_status_id_idx on triggers(status, id);
+create index if not exists triggers_user_created_idx on triggers(user_id, created_at desc);
+create index if not exists trigger_events_trigger_fired_idx on trigger_events(trigger_id, fired_at desc);
 
 alter table triggers enable row level security;
 alter table trigger_events enable row level security;
 alter table push_subscriptions enable row level security;
 
 -- Client access is read-only; the API and evaluator write with the service role.
-revoke insert, update, delete on triggers, trigger_events, push_subscriptions from anon, authenticated;
+revoke all privileges on triggers, trigger_events, push_subscriptions from anon, authenticated;
+grant select on triggers, trigger_events, push_subscriptions to authenticated;
+grant select on triggers to anon;
 
-create policy "triggers_owner_all" on triggers
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "triggers_owner_select" on triggers
+  for select using (auth.uid() = user_id);
 
 create policy "trigger_events_owner_select" on trigger_events
   for select using (exists (
     select 1 from triggers t where t.id = trigger_events.trigger_id and t.user_id = auth.uid()
   ));
 
-create policy "push_subscriptions_owner_all" on push_subscriptions
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "push_subscriptions_owner_select" on push_subscriptions
+  for select using (auth.uid() = user_id);
 
 -- After deploying the evaluate-triggers Edge Function, schedule it from Postgres itself.
 -- Replace <project-ref>, <service-role-key> and <cron-shared-secret> before running.

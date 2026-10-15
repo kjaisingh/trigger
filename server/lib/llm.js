@@ -11,7 +11,7 @@ Supported domains and their subject shape:
 - sports: { "team": string, "opponent"?: string } - the full, canonical team name, not a nickname (e.g. "Los Angeles Lakers" not "Lakers", "Manchester United" not "Man U"; club or national team)
 - crypto: { "coin_id": string } - a CoinGecko coin id, e.g. "bitcoin", "ethereum", "dogecoin"
 
-Condition shape (same shape for every domain): { "metric": string, "operator": ">"|">="|"<"|"<="|"=="|"!=", "threshold": number|boolean, "edge_trigger": boolean }
+Condition shape (same shape for every domain): { "metric": string, "operator": ">"|">="|"<"|"<="|"=="|"!=", "threshold": number, "edge_trigger": boolean }
 
 Allowed metrics per domain:
 - weather: temperature_f, precipitation_mm, wind_mph, snowfall_cm (use snowfall_cm specifically for snow requests, precipitation_mm for rain/general precipitation)
@@ -26,7 +26,7 @@ Respond with only a JSON object shaped exactly like this:
 {
   "domain": "weather" | "sports" | "crypto" | "unsupported",
   "subject": { ... } | {},
-  "condition": { "metric": string, "operator": string, "threshold": number|boolean, "edge_trigger": boolean } | {},
+  "condition": { "metric": string, "operator": string, "threshold": number, "edge_trigger": boolean } | {},
   "unsupported_reason": string | null
 }`;
 
