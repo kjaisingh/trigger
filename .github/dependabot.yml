@@ -1,25 +1,13 @@
 version: 2
+# Keep version updates manual so Dependabot does not leave non-main branches.
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
-    groups:
-      compatible-updates:
-        update-types:
-          - minor
-          - patch
-    ignore:
-      # These majors need coordinated React/React DOM or ESLint/plugin migrations.
-      - dependency-name: react
-        update-types: ['version-update:semver-major']
-      - dependency-name: react-dom
-        update-types: ['version-update:semver-major']
-      - dependency-name: eslint
-        update-types: ['version-update:semver-major']
-      - dependency-name: '@eslint/js'
-        update-types: ['version-update:semver-major']
+    open-pull-requests-limit: 0
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    open-pull-requests-limit: 0

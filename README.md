@@ -65,6 +65,10 @@ The enabled [cron-job.org](https://console.cron-job.org/jobs) job `Trigger Supab
 
 This request reaches Supabase directly, even when the Render service is asleep. Monitor failed runs; free-tier activity does not guarantee uninterrupted availability.
 
+## Dependency maintenance
+
+Dependabot version-update PRs are disabled in [`.github/dependabot.yml`](.github/dependabot.yml) so the repository keeps only `main`. CI still runs `npm audit`, formatting, lint, tests, and the build. Review dependency releases manually and update related packages together, especially React with React DOM and ESLint with its plugins. Increase `open-pull-requests-limit` to resume automated update PRs.
+
 ## Feature backlog
 
 - Add email and SMS delivery with per-channel preferences.
