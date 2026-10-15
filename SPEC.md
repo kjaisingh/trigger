@@ -12,7 +12,7 @@ This describes the current app. Setup and deployment steps are in [`README.md`](
 
 ## Stored fields
 
-`triggers` contains `id`, `user_id`, `raw_prompt`, `domain`, `subject`, `condition`, `channels`, `status`, `recurring`, `unsupported_reason`, `last_checked_at`, `last_state`, and `created_at`. `trigger_events` contains `trigger_id`, `fired_at`, `payload`, `channels_sent`, and optional `error`. `push_subscriptions` contains a globally unique `endpoint`, `user_id`, encryption `keys`, and `created_at`. See [`supabase/schema.sql`](supabase/schema.sql) for SQL types and RLS policies. Client roles have SELECT-only grants and policies; the API and evaluator use the service role for writes. The existing hosted project received [`20261015_read_only_clients.sql`](supabase/migrations/20261015_read_only_clients.sql).
+`triggers` contains `id`, `user_id`, `raw_prompt`, `domain`, `subject`, `condition`, `channels`, `status`, `recurring`, `unsupported_reason`, `last_checked_at`, `last_state`, and `created_at`. `trigger_events` contains `trigger_id`, `fired_at`, `payload`, `channels_sent`, and optional `error`. `push_subscriptions` contains a globally unique `endpoint`, `user_id`, encryption `keys`, and `created_at`. See [`supabase/schema.sql`](supabase/schema.sql) for SQL types and RLS policies. Client roles have SELECT-only grants and policies; the API and evaluator use the service role for writes.
 
 | Domain    | Parsed subject        | Resolved subject                                        | Allowed metrics                                                |
 | --------- | --------------------- | ------------------------------------------------------- | -------------------------------------------------------------- |

@@ -2,107 +2,65 @@
 
 [![CI](https://github.com/kjaisingh/trigger/actions/workflows/ci.yml/badge.svg)](https://github.com/kjaisingh/trigger/actions/workflows/ci.yml)
 
-Trigger turns a plain-English request into a weather, sports, or crypto alert. You review and edit the parsed condition before saving it. A Supabase scheduled function checks active triggers every 15 minutes and sends browser push notifications when a condition fires. Alerts are not real time.
+Trigger turns a plain-English request into an editable alert. A scheduled check evaluates saved conditions every 15 minutes and records matches; browser push notifications require permission on each device. Alerts are not real time.
 
-## What it supports
+## Features
 
-| Domain  | Data source                                | Metrics                                                              |
-| ------- | ------------------------------------------ | -------------------------------------------------------------------- |
-| Weather | [Open-Meteo](https://open-meteo.com)       | Temperature (°F), precipitation (mm), wind (mph), snowfall (cm)      |
-| Sports  | [TheSportsDB](https://www.thesportsdb.com) | Team score, opponent score, score difference for a live scored match |
-| Crypto  | [CoinGecko](https://www.coingecko.com)     | USD price                                                            |
-
-A level trigger fires on each check while its condition is true if recurring is enabled. An edge trigger first records a baseline, then fires only when the condition changes from false to true. A one-time trigger becomes `fired` after its first match. Unsupported requests can be saved for reference, but are not monitored. Push delivery requires an enabled subscription on the device; history records when a condition fired even if no push reached a device.
-
-Sports scores depend on the provider exposing a scored live event. Completed games and fixtures without scores do not fire alerts. Free data sources can rate limit or delay updates. The 15-minute schedule adds up to one polling interval of delay, plus provider and push delivery latency.
-Use a team's full name when editing a sports trigger. Team lookup rejects unrelated fuzzy matches, the same team as its opponent, and teams from different sports.
+- Create, edit, pause, resume, and delete alerts from natural-language requests.
+- Monitor supported data:
+  - Weather via Open-Meteo: temperature, precipitation, wind, and snowfall.
+  - Live sports via TheSportsDB: team score, opponent score, and score difference.
+  - Crypto via CoinGecko: USD coin price.
+- Choose one-time or recurring alerts, with level or false-to-true edge conditions.
+- Review check status and alert history; save unsupported requests without monitoring them.
+- Install the web app and enable push notifications per device.
 
 ## Architecture
 
-- React/Vite client and Express API run together on Render. Supabase Auth handles email/password sign-in; the API checks the user's bearer token.
-- Supabase Postgres stores triggers, events, and push subscriptions. Authenticated clients may read their own records through row level security. Validated API routes and the Edge Function write with a service role key.
-- Supabase `pg_cron` and `pg_net` invoke `evaluate-triggers`. This runs independently of the Render web service. Groq parses a prompt once when you create a trigger; evaluation uses deterministic comparisons.
-- Web Push uses a VAPID key pair. The app can be installed from its web manifest. On iPhone, push requires adding the site to the Home Screen.
+- React and Vite provide the client; an Express API serves it on Render and verifies Supabase Auth tokens.
+- Supabase Postgres stores alerts, history, and push subscriptions with row level security.
+- Groq parses a request when it is created. Domain adapters compare values deterministically during checks.
+- Supabase `pg_cron` and `pg_net` call an Edge Function every 15 minutes, independently of Render.
+- Web Push uses VAPID keys to deliver device notifications.
 
-## Local setup
+## Setup
 
-1. Install Node.js 22.12 or newer, the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started), and a Supabase project. Run [`supabase/schema.sql`](supabase/schema.sql) in the project's SQL editor for a new project only. It creates tables, indexes, read-only client grants, and RLS policies. On an existing deployment, apply the relevant file in [`supabase/migrations`](supabase/migrations); rerunning the full schema would duplicate policies.
-2. Run `npm ci`. Copy `.env.example` to `.env` and fill in Supabase URL and keys, a [Groq API key](https://console.groq.com), and VAPID keys from `npx web-push generate-vapid-keys`. Use the same VAPID public key in `VAPID_PUBLIC_KEY` and `VITE_VAPID_PUBLIC_KEY`. The service role and private VAPID keys must stay server-side.
-3. Run `npm run dev`. Open `http://localhost:5173`; the API runs at `http://localhost:3001`. `CLIENT_URL` allows the local Vite origin; `VITE_API_URL` points the client to the local API. Supabase's scheduled evaluator is separate, so creating a trigger locally does not start local polling.
-4. In the app, sign up, create a trigger, then enable push in Settings. Browser push needs HTTPS or localhost and browser permission.
-
-## Deploy
-
-1. Create a Render Blueprint from [`render.yaml`](render.yaml), or create one Node web service with build command `npm ci && npm run build`, start command `npm start`, and health check `/api/health`. Fill in the service's Supabase, Groq, and VAPID environment variables. The frontend and API share an origin on Render, so `VITE_API_URL` and `CLIENT_URL` are not needed there. `VITE_*` values are embedded during build; changing them requires a rebuild.
-2. Set Edge Function secrets with the same VAPID key pair and a new random `CRON_SHARED_SECRET`. Supabase provides `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to hosted Edge Functions. Then deploy the function:
+1. Install Node.js 22.12 or newer and the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started). Create a Supabase project and run [`supabase/schema.sql`](supabase/schema.sql) in its SQL Editor.
+2. Install dependencies, then copy [`.env.example`](.env.example) to `.env`.
 
    ```bash
-   supabase secrets set --project-ref <project-ref> VAPID_SUBJECT=mailto:you@example.com VAPID_PUBLIC_KEY=<public-key> VAPID_PRIVATE_KEY=<private-key> CRON_SHARED_SECRET=<random-secret> SPORTSDB_API_KEY=3
+   npm ci
+   ```
+
+   ```bash
+   cp .env.example .env
+   ```
+
+3. Generate VAPID keys. Fill in the Supabase, Groq, and VAPID values in `.env`; use the same public key for `VAPID_PUBLIC_KEY` and `VITE_VAPID_PUBLIC_KEY`.
+
+   ```bash
+   npx web-push generate-vapid-keys
+   ```
+
+4. Start the client at <http://localhost:5173>. Local development does not start the scheduled evaluator.
+
+   ```bash
+   npm run dev
+   ```
+
+5. Create a [Render Blueprint](render.yaml) and set its Supabase, Groq, and VAPID environment values. Add the public origin to Supabase Auth's allowed redirect URLs.
+6. Set the Edge Function's `VAPID_SUBJECT`, VAPID keys, and a new `CRON_SHARED_SECRET` in Supabase. Deploy the evaluator:
+
+   ```bash
    supabase functions deploy evaluate-triggers --project-ref <project-ref>
    ```
 
-3. Edit the commented `cron.schedule` block at the end of [`supabase/schema.sql`](supabase/schema.sql): enter the project ref, service role key, and the same cron secret, then run that block in the Supabase SQL editor. Keep these credentials out of Git. It schedules a check every 15 minutes.
-4. Check `/api/health` for web-process liveness and `/api/ready` for database reachability. Sign in, send a test notification from Settings, and inspect a trigger's Last checked and History fields after a scheduled run. Render deployment does **not** deploy the Supabase function or SQL; repeat function deployment after changing its code.
+7. Fill in and run the commented `cron.schedule` block in [`supabase/schema.sql`](supabase/schema.sql) using the project ref, service role key, and same cron secret. Keep these values out of Git. See [the behavior contract](SPEC.md) for evaluation rules.
 
-### Existing Trigger deployment
+## Feature backlog
 
-The hosted app is at [trigger-rhji.onrender.com](https://trigger-rhji.onrender.com) and uses Supabase project `lzjdswxkdlmmajmsurwt`. Its `evaluate-triggers` cron job was active on a `*/15 * * * *` schedule on 2026-10-15. The database migration [`20261015_read_only_clients.sql`](supabase/migrations/20261015_read_only_clients.sql) was applied: clients have SELECT-only access, while the API and evaluator retain service-role writes. The scheduled GitHub activity workflow has passed repeated runs. Recheck these services after changing project credentials or deploying a new Supabase project.
-
-For this existing project, use the app directly. You do not need to rerun the full schema or recreate the Render service. To receive alerts, sign in and enable notifications in Settings on each browser or device you want to use, then send a test notification. Check the trigger's Last checked field after the next scheduled run; active checks show a delay warning after 30 minutes without a check. Confirm your Supabase Auth Site URL and allowed redirect URLs include the hosted origin and its `/auth` password-reset route. Trigger details display the latest 100 history events; older events remain in Postgres.
-
-### Owner checklist
-
-1. Open the hosted app, sign in, and create a trigger. After the next scheduled run, confirm its Last checked time advances. Use Refresh on the detail page to load the latest state.
-2. On each device you want alerted, enable notifications in Settings and send a test notification. Browser permission and delivery must be checked on that device.
-3. Keep an offsite database export if losing alert history would matter. Supabase Free does not include guaranteed uptime or a managed backup policy for this app. See [database recovery](#database-recovery).
-4. Optionally configure an independent free cron-job.org check below for long-term activity when this public GitHub repository has no commits for 60 days.
-
-## Free Supabase project activity
-
-Supabase may pause a Free project after seven days of low database activity. The [Supabase activity workflow](.github/workflows/supabase-keepalive.yml) makes a small, read-only database request three times a day (04:17, 12:17, and 20:17 UTC), then checks the hosted `/api/ready` endpoint. It reduces the risk of an inactivity pause and detects an unavailable app or database; [Supabase does not guarantee that Free projects stay active](https://supabase.com/docs/guides/platform/free-project-pausing). This is a best-effort activity and monitoring setup, not a database backup.
-
-This workflow is configured for Trigger's Supabase project and hosted app. The anonymous role can query the `triggers` table, but row level security returns no user records. Use the project's **anon** API key, never its service role key. For a new deployment, set all three variables and the secret below to that deployment's URLs, table, and key.
-
-```bash
-gh variable set SUPABASE_KEEPALIVE_URL --body https://YOUR_PROJECT_REF.supabase.co
-gh variable set SUPABASE_KEEPALIVE_TABLE --body triggers
-gh variable set TRIGGER_READY_URL --body https://trigger-rhji.onrender.com/api/ready
-gh secret set SUPABASE_KEEPALIVE_ANON_KEY
-gh workflow run supabase-keepalive.yml
-```
-
-Enter the anon key when `gh secret set` prompts. Check the dispatched run under GitHub Actions; both steps must report HTTP 200. A new project's chosen table needs an `id` column that the anon role can read without exposing private rows. A paused project must be resumed once before requests can succeed.
-
-GitHub [automatically disables scheduled workflows in public repositories after 60 days without repository activity](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-workflow-runs/disabling-and-enabling-a-workflow). For long-term scheduling independent of repository activity, create a free [cron-job.org](https://cron-job.org/en/) job with the same three daily times. Set its method to `GET`, URL to `https://YOUR_PROJECT_REF.supabase.co/rest/v1/YOUR_TABLE?select=id&limit=1`, and headers `apikey: YOUR_ANON_KEY` and `Authorization: Bearer YOUR_ANON_KEY`. Enable failure notifications and run a test; expect HTTP 200. Use the same project and RLS-protected table as the GitHub workflow. The GitHub workflow remains available for manual checks.
-
-## Database recovery
-
-The app stores data in hosted Supabase Postgres, so Render restarts do not erase triggers or history. The activity workflow and cron reduce idle pauses but cannot guarantee Free-tier availability. If the project pauses, resume it in the Supabase dashboard, check `/api/ready`, then verify the `evaluate-triggers` cron job and a trigger's Last checked time. If Supabase reports the project can no longer be restored, use its dashboard export/download option for the remaining data. For your own offsite copy while the project is active, follow [Supabase's database backup/export guide](https://supabase.com/docs/guides/platform/backups) and store the export outside this public repository. Exports can contain account identifiers and push subscription keys.
-
-## Configuration
-
-[`.env.example`](.env.example) lists local variables. Render's Blueprint lists deployed web-service variables. `SUPABASE_SERVICE_ROLE_KEY`, `GROQ_API_KEY`, and `VAPID_PRIVATE_KEY` are secrets. `VITE_SUPABASE_ANON_KEY` and `VITE_VAPID_PUBLIC_KEY` are intentionally public. The Edge Function additionally needs `CRON_SHARED_SECRET` (not the Render service). `SPORTSDB_API_KEY` defaults to the free test key `3`.
-`GROQ_MODEL` is optional and defaults to `openai/gpt-oss-20b`; choose a model available to your Groq account if it changes.
-
-## Checks
-
-```bash
-npm ci
-npm audit --audit-level=moderate
-npm run format:check
-npm run lint
-npm test
-npm run build
-deno check supabase/functions/evaluate-triggers/index.ts
-```
-
-GitHub Actions runs these checks on pushes and pull requests to `main`. Dependabot proposes weekly npm and Actions updates. `npm run format` writes Prettier changes. `/api/health` checks the web process; `/api/ready` makes a bounded database query and returns 503 when Supabase is unavailable.
-
-## Current limits
-
-- Only push notifications are implemented. Notification permission and subscription are per device; Settings controls the current device.
-- One global 15-minute schedule checks active triggers. Provider freshness and rate limits can delay or prevent a check. Check errors appear on the trigger card and detail page.
-- The free TheSportsDB API may not expose every live game's score. Trigger skips completed games rather than alerting on stale results.
-- Groq parsing and geocoding/team/coin lookup require network access when creating a trigger. The API limits parse requests to ten per user per minute and caps prompt length at 500 characters.
-
-See [`SPEC.md`](SPEC.md) for the data contract and evaluation rules.
+- Add email and SMS delivery with per-channel preferences.
+- Support more domains, such as stocks, air quality, and RSS feeds.
+- Let users choose check intervals and quiet hours.
+- Add provider failover, caching, and delivery retries with visibility into failures.
+- Add automated database backups and alerts for stalled scheduled checks.
