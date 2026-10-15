@@ -67,7 +67,7 @@ This request reaches Supabase directly, even when the Render service is asleep. 
 
 ## Dependency maintenance
 
-Dependabot version-update PRs are disabled in [`.github/dependabot.yml`](.github/dependabot.yml) so the repository keeps only `main`. CI still runs `npm audit`, formatting, lint, tests, and the build. Review dependency releases manually and update related packages together, especially React with React DOM and ESLint with its plugins. Increase `open-pull-requests-limit` to resume automated update PRs.
+Dependabot version-update PRs are disabled in [`.github/dependabot.yml`](.github/dependabot.yml) so the repository keeps only `main`. CI runs `npm audit`, formatting, lint, tests, and the build on pushes and weekly (Monday 09:17 UTC); it can also be started manually. Review dependency releases manually and update related packages together, especially React with React DOM and ESLint with its plugins. Increase `open-pull-requests-limit` to resume automated update PRs. GitHub may disable scheduled workflows after prolonged inactivity in a public repository, so do not treat the weekly audit as a guaranteed security monitor.
 
 ## Feature backlog
 
