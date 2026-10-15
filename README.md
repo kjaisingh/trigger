@@ -61,7 +61,7 @@ For this existing project, use the app directly. You do not need to rerun the fu
 
 Supabase may pause a Free project after seven days of low database activity. The [Supabase activity workflow](.github/workflows/supabase-keepalive.yml) makes a small, read-only database request three times a day (04:17, 12:17, and 20:17 UTC), then checks the hosted `/api/ready` endpoint. It reduces the risk of an inactivity pause and detects an unavailable app or database; [Supabase does not guarantee that Free projects stay active](https://supabase.com/docs/guides/platform/free-project-pausing). This is a best-effort activity and monitoring setup, not a database backup.
 
-Configure the workflow for the **project you want to keep active**. For Trigger, use its Supabase URL and the `triggers` table. The anonymous role can query that table, but row level security returns no user records. Use the project's **anon** API key, never its service role key.
+This workflow is configured for Trigger's Supabase project and hosted app. The anonymous role can query the `triggers` table, but row level security returns no user records. Use the project's **anon** API key, never its service role key. For a new deployment, set all three variables and the secret below to that deployment's URLs, table, and key.
 
 ```bash
 gh variable set SUPABASE_KEEPALIVE_URL --body https://YOUR_PROJECT_REF.supabase.co
@@ -71,7 +71,7 @@ gh secret set SUPABASE_KEEPALIVE_ANON_KEY
 gh workflow run supabase-keepalive.yml
 ```
 
-Enter the anon key when `gh secret set` prompts. Check the dispatched run under GitHub Actions; it must report HTTP 200. If you target another Supabase project, choose a table with an `id` column that the anon role can read without exposing private rows. A paused project must be resumed once before requests can succeed.
+Enter the anon key when `gh secret set` prompts. Check the dispatched run under GitHub Actions; both steps must report HTTP 200. A new project's chosen table needs an `id` column that the anon role can read without exposing private rows. A paused project must be resumed once before requests can succeed.
 
 GitHub [automatically disables scheduled workflows in public repositories after 60 days without repository activity](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-workflow-runs/disabling-and-enabling-a-workflow). For long-term scheduling independent of repository activity, create a free [cron-job.org](https://cron-job.org/en/) job with the same three daily times. Set its method to `GET`, URL to `https://YOUR_PROJECT_REF.supabase.co/rest/v1/YOUR_TABLE?select=id&limit=1`, and headers `apikey: YOUR_ANON_KEY` and `Authorization: Bearer YOUR_ANON_KEY`. Enable failure notifications and run a test; expect HTTP 200. Use the same project and RLS-protected table as the GitHub workflow. The GitHub workflow remains available for manual checks.
 
