@@ -53,5 +53,10 @@ test('database readiness times out', async () => {
       }),
     }),
   };
-  assert.equal(await databaseReady(hanging, 5), false);
+  const keepAlive = globalThis.setTimeout(() => {}, 100);
+  try {
+    assert.equal(await databaseReady(hanging, 5), false);
+  } finally {
+    globalThis.clearTimeout(keepAlive);
+  }
 });
