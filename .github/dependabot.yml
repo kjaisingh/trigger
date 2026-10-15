@@ -9,6 +9,16 @@ updates:
         update-types:
           - minor
           - patch
+    ignore:
+      # These majors need coordinated React/React DOM or ESLint/plugin migrations.
+      - dependency-name: react
+        update-types: ['version-update:semver-major']
+      - dependency-name: react-dom
+        update-types: ['version-update:semver-major']
+      - dependency-name: eslint
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@eslint/js'
+        update-types: ['version-update:semver-major']
   - package-ecosystem: github-actions
     directory: /
     schedule:
