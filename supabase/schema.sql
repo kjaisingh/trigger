@@ -49,7 +49,6 @@ alter table push_subscriptions enable row level security;
 -- Client access is read-only; the API and evaluator write with the service role.
 revoke all privileges on triggers, trigger_events, push_subscriptions from anon, authenticated;
 grant select on triggers, trigger_events, push_subscriptions to authenticated;
-grant select on triggers to anon;
 
 create policy "triggers_owner_select" on triggers
   for select using (auth.uid() = user_id);
