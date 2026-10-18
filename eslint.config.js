@@ -29,7 +29,7 @@ export default [
     },
   },
   {
-    files: ['server/**/*.js', '.github/scripts/**/*.{js,mjs}'],
+    files: ['server/**/*.js'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',
