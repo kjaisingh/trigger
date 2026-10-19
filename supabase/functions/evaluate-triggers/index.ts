@@ -67,7 +67,7 @@ async function evaluateWeather(subject: any, condition: any) {
 }
 
 async function fetchTeamEvents(teamId: string, endpoint: string) {
-  const key = Deno.env.get('SPORTSDB_API_KEY') || '3';
+  const key = Deno.env.get('SPORTSDB_API_KEY') || '123';
   const res = await fetchWithRetry(
     `https://www.thesportsdb.com/api/v1/json/${key}/${endpoint}.php?id=${teamId}`,
   );

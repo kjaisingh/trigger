@@ -29,4 +29,4 @@ services:
       - key: VAPID_SUBJECT
         sync: false
       - key: SPORTSDB_API_KEY
-        value: 3
+        value: 123
