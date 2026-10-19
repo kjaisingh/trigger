@@ -1,17 +1,27 @@
 import { fetchWithRetry } from '../http.js';
 import { PublicError } from '../validation.js';
 
-const BASE_URL = `https://www.thesportsdb.com/api/v1/json/${process.env.SPORTSDB_API_KEY || '3'}`;
+const BASE_URL = `https://www.thesportsdb.com/api/v1/json/${process.env.SPORTSDB_API_KEY || '123'}`;
 
 async function searchTeam(name) {
   const url = new URL(`${BASE_URL}/searchteams.php`);
   url.searchParams.set('t', name);
 
-  const res = await fetchWithRetry(url);
-  if (!res.ok) {
-    throw new Error(`TheSportsDB lookup failed (${res.status}). Try again in a moment.`);
+  let res;
+  try {
+    res = await fetchWithRetry(url);
+  } catch {
+    throw new PublicError('Sports team lookup is unavailable right now. Try again later.', 502);
   }
-  const data = await res.json();
+  if (!res.ok) {
+    throw new PublicError('Sports team lookup is unavailable right now. Try again later.', 502);
+  }
+  let data;
+  try {
+    data = await res.json();
+  } catch {
+    throw new PublicError('Sports team lookup is unavailable right now. Try again later.', 502);
+  }
   const normalize = (value) =>
     value
       .toLowerCase()
@@ -21,7 +31,7 @@ async function searchTeam(name) {
       .trim();
   const wanted = normalize(name);
   const match = data.teams?.find((team) =>
-    [team.strTeam, ...(team.strAlternate || '').split(',')].some(
+    [team.strTeam, ...(team.strTeamAlternate || '').split(',')].some(
       (candidate) => candidate && normalize(candidate) === wanted,
     ),
   );

@@ -27,6 +27,48 @@ test('team lookup accepts a canonical full name', async (t) => {
   assert.equal(subject.teamName, 'Los Angeles Lakers');
 });
 
+test('team lookup resolves the Premier League clubs by canonical and alternate names', async (t) => {
+  t.mock.method(globalThis, 'fetch', async (url) => ({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      teams: [
+        new URL(url).searchParams.get('t') === 'Chelsea FC'
+          ? {
+              idTeam: '133610',
+              strTeam: 'Chelsea',
+              strTeamAlternate: 'Chelsea FC',
+              strSport: 'Soccer',
+            }
+          : { idTeam: '133616', strTeam: 'Tottenham Hotspur', strSport: 'Soccer' },
+      ],
+    }),
+  }));
+
+  const subject = await resolveSubject({ team: 'Chelsea FC', opponent: 'Tottenham Hotspur' });
+  assert.equal(subject.teamId, '133610');
+  assert.equal(subject.opponentId, '133616');
+});
+
+test('retired provider key gives a public service error', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 403 }));
+  await assert.rejects(resolveSubject({ team: 'Chelsea' }), {
+    status: 502,
+    message: 'Sports team lookup is unavailable right now. Try again later.',
+  });
+});
+
+test('invalid provider JSON gives a public service error', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    status: 200,
+    json: async () => {
+      throw new SyntaxError('Invalid JSON');
+    },
+  }));
+  await assert.rejects(resolveSubject({ team: 'Chelsea' }), { status: 502 });
+});
+
 test('team lookup rejects the same team as its opponent', async (t) => {
   t.mock.method(globalThis, 'fetch', async () => ({
     ok: true,
