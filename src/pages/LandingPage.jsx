@@ -1,17 +1,18 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 
 export default function LandingPage() {
   const { user } = useAuth();
-  const { state } = useLocation();
+  const [searchParams] = useSearchParams();
   useDocumentTitle();
 
   return (
     <div className="hero">
-      {state?.warning && (
+      {searchParams.get('notificationCleanup') === 'failed' && (
         <p className="warn-text" role="alert">
-          {state.warning}
+          Signed out. Notification cleanup failed; disable site notifications in your browser on
+          shared devices.
         </p>
       )}
       <span className="hero-kicker">Plain-English alerts</span>

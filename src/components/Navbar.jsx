@@ -1,11 +1,10 @@
 import { useState } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { disablePush } from '../lib/push.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
 export default function Navbar() {
   const { user, loading, signOut } = useAuth();
-  const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [signOutError, setSignOutError] = useState('');
   const [signingOut, setSigningOut] = useState(false);
@@ -14,17 +13,17 @@ export default function Navbar() {
     setSignOutError('');
     setSigningOut(true);
     try {
-      let warning = '';
+      let cleanupFailed = false;
       try {
         await disablePush();
       } catch {
-        warning =
-          'Signed out. Notification cleanup failed; disable site notifications in your browser on shared devices.';
+        cleanupFailed = true;
       }
       const { error } = await signOut();
       if (error) throw error;
       setMenuOpen(false);
-      navigate('/', { state: { warning } });
+      // Clear account-specific UI and avoid competing auth redirects.
+      window.location.replace(cleanupFailed ? '/?notificationCleanup=failed' : '/');
     } catch (error) {
       setSignOutError(error.message || 'Could not sign out. Please try again.');
     } finally {
