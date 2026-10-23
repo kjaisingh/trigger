@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { disablePush } from '../lib/push.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
 export default function Navbar() {
@@ -7,16 +8,27 @@ export default function Navbar() {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [signOutError, setSignOutError] = useState('');
+  const [signingOut, setSigningOut] = useState(false);
 
   async function handleSignOut() {
     setSignOutError('');
+    setSigningOut(true);
     try {
+      let warning = '';
+      try {
+        await disablePush();
+      } catch {
+        warning =
+          'Signed out. Notification cleanup failed; disable site notifications in your browser on shared devices.';
+      }
       const { error } = await signOut();
       if (error) throw error;
       setMenuOpen(false);
-      navigate('/');
+      navigate('/', { state: { warning } });
     } catch (error) {
       setSignOutError(error.message || 'Could not sign out. Please try again.');
+    } finally {
+      setSigningOut(false);
     }
   }
 
@@ -56,14 +68,14 @@ export default function Navbar() {
       >
         {loading ? null : user ? (
           <>
-            <Link to="/dashboard" onClick={closeMenu}>
+            <NavLink to="/dashboard" onClick={closeMenu}>
               Dashboard
-            </Link>
-            <Link to="/settings" onClick={closeMenu}>
+            </NavLink>
+            <NavLink to="/settings" onClick={closeMenu}>
               Settings
-            </Link>
-            <button className="link-button" onClick={handleSignOut}>
-              Sign out
+            </NavLink>
+            <button className="link-button" onClick={handleSignOut} disabled={signingOut}>
+              {signingOut ? 'Signing out...' : 'Sign out'}
             </button>
             {signOutError && (
               <p className="error-text" role="alert">

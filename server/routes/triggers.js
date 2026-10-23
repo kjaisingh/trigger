@@ -170,15 +170,31 @@ router.patch('/:id', async (req, res, next) => {
       return res.status(400).json({ message: 'status must be "active" or "paused".' });
     }
 
+    const current = unwrap(
+      await supabase
+        .from('triggers')
+        .select('status,domain')
+        .eq('id', req.params.id)
+        .eq('user_id', req.user.id)
+        .single(),
+    );
+    if (!['active', 'paused'].includes(current.status) || current.domain === 'unsupported') {
+      return res.status(409).json({ message: 'Only active or paused triggers can change status.' });
+    }
+
     const updated = unwrap(
       await supabase
         .from('triggers')
         .update({ status })
         .eq('id', req.params.id)
         .eq('user_id', req.user.id)
+        .eq('status', current.status)
         .select()
-        .single(),
+        .maybeSingle(),
     );
+
+    if (!updated)
+      return res.status(409).json({ message: 'This trigger changed. Refresh and try again.' });
 
     res.json(updated);
   } catch (error) {

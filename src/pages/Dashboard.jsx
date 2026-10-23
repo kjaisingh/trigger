@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import TriggerCard from '../components/TriggerCard.jsx';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
+import { describeSubject } from '../lib/summarize.js';
+import { checkHealth } from '../lib/checkHealth.js';
 
 export default function Dashboard() {
   useDocumentTitle('Dashboard');
@@ -30,7 +32,9 @@ export default function Dashboard() {
   const filtered = triggers?.filter(
     (trigger) =>
       (status === 'all' || trigger.status === status) &&
-      trigger.raw_prompt.toLowerCase().includes(query.toLowerCase().trim()),
+      `${trigger.raw_prompt} ${trigger.domain} ${describeSubject(trigger.domain, trigger.subject)}`
+        .toLowerCase()
+        .includes(query.toLowerCase().trim()),
   );
 
   return (
@@ -84,6 +88,24 @@ export default function Dashboard() {
         </div>
       ) : (
         <>
+          <div className="dashboard-summary" aria-label="Trigger overview">
+            {[
+              ['Watching', triggers.filter((t) => t.status === 'active').length],
+              ['Paused', triggers.filter((t) => t.status === 'paused').length],
+              ['Fired', triggers.filter((t) => t.status === 'fired').length],
+              [
+                'Need attention',
+                triggers.filter(
+                  (t) => t.status === 'active' && (t.last_state?.error || checkHealth(t)?.delayed),
+                ).length,
+              ],
+            ].map(([label, count]) => (
+              <div className="summary-item" key={label}>
+                <strong>{count}</strong>
+                <span>{label}</span>
+              </div>
+            ))}
+          </div>
           <div className="row trigger-filters">
             <input
               aria-label="Search triggers"
@@ -102,6 +124,7 @@ export default function Dashboard() {
               <option value="paused">Paused</option>
               <option value="fired">Fired</option>
               <option value="unsupported">Unsupported</option>
+              <option value="error">Error</option>
             </select>
           </div>
           <p className="muted" role="status">
@@ -114,7 +137,18 @@ export default function Dashboard() {
               ))}
             </div>
           ) : (
-            <p className="empty-state">No triggers match those filters.</p>
+            <div className="empty-state">
+              <p>No triggers match those filters.</p>
+              <button
+                className="button"
+                onClick={() => {
+                  setQuery('');
+                  setStatus('all');
+                }}
+              >
+                Clear filters
+              </button>
+            </div>
           )}
         </>
       )}

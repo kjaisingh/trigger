@@ -8,6 +8,7 @@ export default function Settings() {
   const [pushSupported, setPushSupported] = useState(null);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pending, setPending] = useState(false);
+  const [checking, setChecking] = useState(true);
   const [message, setMessage] = useState(null);
 
   useEffect(() => {
@@ -19,8 +20,10 @@ export default function Settings() {
       if (supported) {
         try {
           const subscription = await getPushSubscription();
-          if (subscription) await api.post('/api/push/subscribe', { subscription });
-          if (mounted) setPushEnabled(Boolean(subscription));
+          const status = subscription
+            ? await api.post('/api/push/status', { endpoint: subscription.endpoint })
+            : null;
+          if (mounted) setPushEnabled(Boolean(status?.enabled));
         } catch (error) {
           if (mounted) {
             setPushEnabled(false);
@@ -31,6 +34,7 @@ export default function Settings() {
           }
         }
       }
+      if (mounted) setChecking(false);
     }
     load();
     return () => {
@@ -50,6 +54,7 @@ export default function Settings() {
         setPushEnabled(true);
       }
     } catch (error) {
+      if (pushEnabled) setPushEnabled(Boolean(await getPushSubscription().catch(() => null)));
       setMessage({
         error: true,
         text:
@@ -83,7 +88,7 @@ export default function Settings() {
       <div className="card stack">
         <h3>Push notifications</h3>
         <p className="muted">Get alerts on this device, even when Trigger is closed.</p>
-        {pushSupported === null ? (
+        {checking || pushSupported === null ? (
           <p>Checking browser support...</p>
         ) : pushSupported ? (
           <>

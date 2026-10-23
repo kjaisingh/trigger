@@ -25,7 +25,7 @@ const CONDITION_PHRASES = {
   '!=': 'not at',
 };
 
-function formatThreshold(metric, threshold) {
+export function formatValue(metric, threshold) {
   if (metric === 'price_usd') return `$${threshold}`;
   const unit = METRIC_UNITS[metric];
   return unit ? `${threshold}${unit}` : String(threshold);
@@ -50,7 +50,7 @@ export function describeSubject(domain, subject) {
 export function describeCondition(condition) {
   const metric = METRIC_LABELS[condition.metric] || condition.metric;
   const operator = OPERATOR_LABELS[condition.operator] || condition.operator;
-  const value = formatThreshold(condition.metric, condition.threshold);
+  const value = formatValue(condition.metric, condition.threshold);
   return `${metric} ${operator} ${value}${condition.edge_trigger ? ', on transition only' : ''}`;
 }
 
@@ -59,7 +59,7 @@ export function summarizeTrigger(trigger) {
   const { domain, subject, condition } = trigger;
   const who = describeSubject(domain, subject);
   const phrase = CONDITION_PHRASES[condition.operator] || condition.operator;
-  const value = formatThreshold(condition.metric, condition.threshold);
+  const value = formatValue(condition.metric, condition.threshold);
   const metricName = METRIC_SHORT_NAMES[condition.metric];
   return `${who}${metricName ? ` ${metricName}` : ''} ${phrase} ${value}`;
 }

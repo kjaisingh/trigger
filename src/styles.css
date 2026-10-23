@@ -186,6 +186,10 @@ h3 {
     border-color 0.15s ease,
     background-color 0.15s ease,
     opacity 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
 }
 
 .button:hover {
@@ -234,9 +238,11 @@ textarea {
   color: var(--text);
   padding: 10px 12px;
   border-radius: var(--radius);
-  font-size: 0.95rem;
   font-family: inherit;
   transition: border-color 0.15s ease;
+  min-width: 0;
+  max-width: 100%;
+  font-size: 1rem;
 }
 
 input:focus,
@@ -306,7 +312,7 @@ textarea:focus-visible {
 
 .examples .card {
   color: var(--text-muted);
-  font-style: italic;
+  text-align: left;
 }
 
 /* Auth */
@@ -334,8 +340,8 @@ textarea:focus-visible {
 
 .trigger-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
 }
 
 .trigger-card {
@@ -353,6 +359,7 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .trigger-card-header .domain-tag {
@@ -368,11 +375,16 @@ textarea:focus-visible {
 
 .trigger-prompt {
   margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
 }
 
 .trigger-date {
   color: var(--text-muted);
   font-size: 0.85rem;
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
 }
 
 /* Badges */
@@ -626,5 +638,121 @@ textarea:focus-visible {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
+  }
+}
+
+.skip-link {
+  position: absolute;
+  left: 16px;
+  top: -80px;
+  z-index: 20;
+  background: var(--surface);
+  padding: 12px;
+}
+.skip-link:focus {
+  top: 12px;
+}
+.nav-links a[aria-current='page'] {
+  color: var(--accent-hover);
+}
+
+h2,
+.trigger-prompt,
+.trigger-request,
+.event-list li {
+  overflow-wrap: anywhere;
+}
+
+.trigger-request {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.dashboard-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.summary-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: grid;
+  gap: 2px;
+}
+.summary-item strong {
+  font-size: 1.8rem;
+  font-variant-numeric: tabular-nums;
+}
+.summary-item span {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+.example-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: left;
+  font-style: normal;
+}
+.example-card:hover {
+  border-color: var(--accent);
+}
+.example-action {
+  color: var(--accent-hover);
+  font-size: 0.85rem;
+  margin-top: auto;
+}
+.flow-steps {
+  list-style: none;
+  display: flex;
+  padding: 0;
+  margin: 0;
+  gap: 20px;
+  color: var(--text-muted);
+}
+.flow-steps [aria-current='step'] {
+  color: var(--accent-hover);
+}
+.create-trigger {
+  max-width: 640px;
+  margin: auto;
+}
+.create-trigger form {
+  width: 100%;
+  max-width: none;
+}
+.confirm-card {
+  margin: 0;
+  min-width: 0;
+  max-width: none;
+}
+.confirm-card legend {
+  padding: 0 8px;
+  font-weight: 600;
+}
+.notice {
+  border: 1px solid var(--accent);
+  background: rgba(91, 140, 255, 0.08);
+  border-radius: var(--radius);
+  padding: 18px;
+}
+.notice p {
+  margin-bottom: 0;
+}
+@media (max-width: 480px) {
+  .dashboard-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .card {
+    padding: 16px;
+  }
+  .nav-links a,
+  .nav-links button {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
   }
 }

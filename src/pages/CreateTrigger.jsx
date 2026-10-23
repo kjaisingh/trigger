@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 import {
@@ -13,7 +13,10 @@ import { describeSubject, describeCondition } from '../lib/summarize.js';
 export default function CreateTrigger() {
   useDocumentTitle('New trigger');
   const navigate = useNavigate();
-  const [rawPrompt, setRawPrompt] = useState('');
+  const [searchParams] = useSearchParams();
+  const [rawPrompt, setRawPrompt] = useState(() =>
+    (searchParams.get('prompt') || '').slice(0, 500),
+  );
   const [parsed, setParsed] = useState(null);
   const [recurring, setRecurring] = useState(false);
   const [pending, setPending] = useState(null);
@@ -57,7 +60,8 @@ export default function CreateTrigger() {
     });
   }
 
-  async function handleCreate() {
+  async function handleCreate(e) {
+    e.preventDefault();
     const threshold = Number(parsed.condition.threshold);
     if (
       parsed.domain !== 'unsupported' &&
@@ -69,7 +73,7 @@ export default function CreateTrigger() {
     setError('');
     setPending('create');
     try {
-      await api.post('/api/triggers', {
+      const created = await api.post('/api/triggers', {
         raw_prompt: rawPrompt,
         ...parsed,
         condition:
@@ -77,7 +81,7 @@ export default function CreateTrigger() {
         recurring,
         channels: ['push'],
       });
-      navigate('/dashboard');
+      navigate(`/triggers/${created.id}`, { state: { created: true } });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -88,6 +92,10 @@ export default function CreateTrigger() {
   return (
     <div className="stack create-trigger">
       <h2>New trigger</h2>
+      <ol className="flow-steps" aria-label="Create an alert">
+        <li aria-current={parsed ? undefined : 'step'}>1. Describe</li>
+        <li aria-current={parsed ? 'step' : undefined}>2. Review & save</li>
+      </ol>
 
       <form onSubmit={handleParse} className="stack">
         <label htmlFor="trigger-prompt">What should Trigger watch?</label>
@@ -103,6 +111,7 @@ export default function CreateTrigger() {
           rows={3}
           maxLength={500}
           required
+          disabled={pending === 'create'}
         />
         <p className="muted">
           Conditions are checked every 15 minutes. Alerts may arrive later than the event.
@@ -114,6 +123,19 @@ export default function CreateTrigger() {
         >
           {pending === 'parse' ? 'Interpreting...' : 'Continue'}
         </button>
+        {!parsed && (
+          <button
+            type="button"
+            className="link-button"
+            disabled={pending !== null || !rawPrompt.trim()}
+            onClick={() => {
+              setError('');
+              changeDomain('weather');
+            }}
+          >
+            Set condition manually
+          </button>
+        )}
       </form>
 
       {error && (
@@ -123,147 +145,157 @@ export default function CreateTrigger() {
       )}
 
       {parsed && (
-        <div className="card confirm-card stack">
-          <div className="row">
-            <label>Domain</label>
-            <select
-              aria-label="Domain"
-              value={parsed.domain}
-              onChange={(e) => changeDomain(e.target.value)}
+        <form onSubmit={handleCreate}>
+          <fieldset className="card confirm-card stack" disabled={pending !== null}>
+            <legend>Review your alert</legend>
+            <div className="row">
+              <label>Domain</label>
+              <select
+                aria-label="Domain"
+                value={parsed.domain}
+                onChange={(e) => changeDomain(e.target.value)}
+              >
+                <option value="weather">Weather</option>
+                <option value="sports">Sports</option>
+                <option value="crypto">Crypto</option>
+                <option value="unsupported">Unsupported</option>
+              </select>
+            </div>
+
+            {parsed.domain === 'unsupported' ? (
+              <p className="error-text">
+                {parsed.unsupported_reason || "This request isn't supported yet."}
+              </p>
+            ) : (
+              <>
+                <div className="row">
+                  <span className="label">Watching</span>
+                  <span>{describeSubject(parsed.domain, parsed.subject)}</span>
+                </div>
+                <div className="row">
+                  <span className="label">Fires when</span>
+                  <span>
+                    {parsed.condition.threshold === ''
+                      ? 'Enter a threshold below.'
+                      : describeCondition(parsed.condition)}
+                  </span>
+                </div>
+
+                {parsed.domain === 'weather' && (
+                  <input
+                    aria-label="Location"
+                    required
+                    maxLength={100}
+                    placeholder="Location"
+                    value={parsed.subject.location || ''}
+                    onChange={(e) => updateSubjectField('location', e.target.value)}
+                  />
+                )}
+
+                {parsed.domain === 'sports' && (
+                  <>
+                    <input
+                      aria-label="Team"
+                      required
+                      maxLength={100}
+                      placeholder="Team"
+                      value={parsed.subject.team || ''}
+                      onChange={(e) => updateSubjectField('team', e.target.value)}
+                    />
+                    <input
+                      aria-label="Opponent (optional)"
+                      maxLength={100}
+                      placeholder="Opponent (optional)"
+                      value={parsed.subject.opponent || ''}
+                      onChange={(e) => updateSubjectField('opponent', e.target.value)}
+                    />
+                  </>
+                )}
+
+                {parsed.domain === 'crypto' && (
+                  <input
+                    aria-label="Coin id"
+                    required
+                    maxLength={100}
+                    placeholder="Coin id (e.g. bitcoin)"
+                    value={parsed.subject.coin_id || ''}
+                    onChange={(e) => updateSubjectField('coin_id', e.target.value)}
+                  />
+                )}
+
+                <div className="row condition-row">
+                  <select
+                    aria-label="Metric"
+                    value={parsed.condition.metric}
+                    onChange={(e) => updateConditionField('metric', e.target.value)}
+                  >
+                    {METRICS_BY_DOMAIN[parsed.domain]?.map((metric) => (
+                      <option key={metric} value={metric}>
+                        {METRIC_LABELS[metric] || metric}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    aria-label="Comparison"
+                    value={parsed.condition.operator}
+                    onChange={(e) => updateConditionField('operator', e.target.value)}
+                  >
+                    {OPERATORS.map((op) => (
+                      <option key={op} value={op}>
+                        {OPERATOR_LABELS[op] || op}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    aria-label="Threshold"
+                    required
+                    type="number"
+                    step="any"
+                    value={parsed.condition.threshold}
+                    onChange={(e) => {
+                      updateConditionField('threshold', e.target.value);
+                    }}
+                  />
+                </div>
+
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={parsed.condition.edge_trigger}
+                    onChange={(e) => updateConditionField('edge_trigger', e.target.checked)}
+                  />
+                  Only alert on the transition (e.g. "stops raining"), not every check
+                </label>
+
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={recurring}
+                    onChange={(e) => setRecurring(e.target.checked)}
+                  />
+                  Keep alerting every time this happens (recurring)
+                </label>
+              </>
+            )}
+
+            <button
+              type="submit"
+              className="button button-primary"
+              disabled={
+                pending !== null ||
+                (parsed.domain !== 'unsupported' &&
+                  (parsed.condition.threshold === '' ||
+                    !Number.isFinite(Number(parsed.condition.threshold))))
+              }
             >
-              <option value="weather">Weather</option>
-              <option value="sports">Sports</option>
-              <option value="crypto">Crypto</option>
-              <option value="unsupported">Unsupported</option>
-            </select>
-          </div>
-
-          {parsed.domain === 'unsupported' ? (
-            <p className="error-text">
-              {parsed.unsupported_reason || "This request isn't supported yet."}
-            </p>
-          ) : (
-            <>
-              <div className="row">
-                <span className="label">Watching</span>
-                <span>{describeSubject(parsed.domain, parsed.subject)}</span>
-              </div>
-              <div className="row">
-                <span className="label">Fires when</span>
-                <span>
-                  {parsed.condition.threshold === ''
-                    ? 'Enter a threshold below.'
-                    : describeCondition(parsed.condition)}
-                </span>
-              </div>
-
-              {parsed.domain === 'weather' && (
-                <input
-                  aria-label="Location"
-                  placeholder="Location"
-                  value={parsed.subject.location || ''}
-                  onChange={(e) => updateSubjectField('location', e.target.value)}
-                />
-              )}
-
-              {parsed.domain === 'sports' && (
-                <>
-                  <input
-                    aria-label="Team"
-                    placeholder="Team"
-                    value={parsed.subject.team || ''}
-                    onChange={(e) => updateSubjectField('team', e.target.value)}
-                  />
-                  <input
-                    aria-label="Opponent (optional)"
-                    placeholder="Opponent (optional)"
-                    value={parsed.subject.opponent || ''}
-                    onChange={(e) => updateSubjectField('opponent', e.target.value)}
-                  />
-                </>
-              )}
-
-              {parsed.domain === 'crypto' && (
-                <input
-                  aria-label="Coin id"
-                  placeholder="Coin id (e.g. bitcoin)"
-                  value={parsed.subject.coin_id || ''}
-                  onChange={(e) => updateSubjectField('coin_id', e.target.value)}
-                />
-              )}
-
-              <div className="row condition-row">
-                <select
-                  aria-label="Metric"
-                  value={parsed.condition.metric}
-                  onChange={(e) => updateConditionField('metric', e.target.value)}
-                >
-                  {METRICS_BY_DOMAIN[parsed.domain]?.map((metric) => (
-                    <option key={metric} value={metric}>
-                      {METRIC_LABELS[metric] || metric}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  aria-label="Comparison"
-                  value={parsed.condition.operator}
-                  onChange={(e) => updateConditionField('operator', e.target.value)}
-                >
-                  {OPERATORS.map((op) => (
-                    <option key={op} value={op}>
-                      {OPERATOR_LABELS[op] || op}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  aria-label="Threshold"
-                  type="number"
-                  step="any"
-                  value={parsed.condition.threshold}
-                  onChange={(e) => {
-                    updateConditionField('threshold', e.target.value);
-                  }}
-                />
-              </div>
-
-              <label className="checkbox-row">
-                <input
-                  type="checkbox"
-                  checked={parsed.condition.edge_trigger}
-                  onChange={(e) => updateConditionField('edge_trigger', e.target.checked)}
-                />
-                Only alert on the transition (e.g. "stops raining"), not every check
-              </label>
-
-              <label className="checkbox-row">
-                <input
-                  type="checkbox"
-                  checked={recurring}
-                  onChange={(e) => setRecurring(e.target.checked)}
-                />
-                Keep alerting every time this happens (recurring)
-              </label>
-            </>
-          )}
-
-          <button
-            type="button"
-            className="button button-primary"
-            onClick={handleCreate}
-            disabled={
-              pending !== null ||
-              (parsed.domain !== 'unsupported' &&
-                (parsed.condition.threshold === '' ||
-                  !Number.isFinite(Number(parsed.condition.threshold))))
-            }
-          >
-            {pending === 'create'
-              ? 'Creating...'
-              : parsed.domain === 'unsupported'
-                ? 'Save anyway'
-                : 'Create trigger'}
-          </button>
-        </div>
+              {pending === 'create'
+                ? 'Creating...'
+                : parsed.domain === 'unsupported'
+                  ? 'Save anyway'
+                  : 'Create trigger'}
+            </button>
+          </fieldset>
+        </form>
       )}
     </div>
   );

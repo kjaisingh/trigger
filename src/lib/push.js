@@ -12,8 +12,9 @@ export async function isPushSupported() {
 }
 
 export async function getPushSubscription() {
-  const registration = await navigator.serviceWorker.register('/sw.js');
-  return registration.pushManager.getSubscription();
+  if (!(await isPushSupported())) return null;
+  const registration = await navigator.serviceWorker.getRegistration('/');
+  return registration ? registration.pushManager.getSubscription() : null;
 }
 
 export async function enablePush() {
@@ -21,6 +22,7 @@ export async function enablePush() {
     throw new Error('Push notifications are unavailable. Please contact the site owner.');
   }
   const registration = await navigator.serviceWorker.register('/sw.js');
+  await navigator.serviceWorker.ready;
   const existing = await registration.pushManager.getSubscription();
   const subscription =
     existing ||
@@ -34,10 +36,12 @@ export async function enablePush() {
 }
 
 export async function disablePush() {
-  const registration = await navigator.serviceWorker.register('/sw.js');
-  const subscription = await registration.pushManager.getSubscription();
+  const subscription = await getPushSubscription();
   if (!subscription) return;
 
-  await api.post('/api/push/unsubscribe', { endpoint: subscription.endpoint });
-  await subscription.unsubscribe();
+  try {
+    await api.post('/api/push/unsubscribe', { endpoint: subscription.endpoint });
+  } finally {
+    await subscription.unsubscribe();
+  }
 }

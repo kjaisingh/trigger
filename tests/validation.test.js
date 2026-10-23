@@ -38,11 +38,43 @@ test('trigger rejects malformed conditions, subjects and channels', () => {
 
 test('push subscription requires HTTPS and both encryption keys', () => {
   const valid = {
-    endpoint: 'https://push.example.test/subscription',
-    keys: { p256dh: 'public-key', auth: 'auth-secret' },
+    endpoint: 'https://fcm.googleapis.com/fcm/send/subscription',
+    keys: {
+      p256dh: globalThis.Buffer.from([4, ...Array(64).fill(1)]).toString('base64url'),
+      auth: globalThis.Buffer.alloc(16, 1).toString('base64url'),
+    },
   };
   assert.deepEqual(validatePushSubscription(valid), valid);
   assert.equal(validatePushEndpoint(valid.endpoint), valid.endpoint);
   assert.throws(() => validatePushSubscription({ ...valid, keys: {} }), { status: 400 });
   assert.throws(() => validatePushEndpoint('http://example.test'), { status: 400 });
+});
+
+test('push endpoints reject arbitrary hosts and URL authority tricks', () => {
+  for (const endpoint of [
+    'https://127.0.0.1/private',
+    'https://[::1]/',
+    'https://localhost/',
+    'https://fcm.googleapis.com.evil.test/',
+    'https://evil.test/?fcm.googleapis.com',
+    'https://user@fcm.googleapis.com/',
+    'https://fcm.googleapis.com:8443/',
+    'https://fcm.googleapis.com/#fragment',
+    'https://',
+  ])
+    assert.throws(() => validatePushEndpoint(endpoint), { status: 400 });
+  for (const endpoint of [
+    'https://fcm.googleapis.com/fcm/send/abc',
+    'https://updates.push.services.mozilla.com/wpush/v2/abc',
+    'https://web.push.apple.com/abc',
+    'https://wns2-par02p.notify.windows.com/w/?token=abc',
+  ])
+    assert.equal(validatePushEndpoint(endpoint), endpoint);
+});
+
+test('subject normalization strips unknown fields and trims values', () => {
+  assert.deepEqual(
+    validateTrigger({ ...validTrigger, subject: { location: ' Boston ', lat: 3 } }).subject,
+    { location: 'Boston' },
+  );
 });

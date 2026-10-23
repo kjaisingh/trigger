@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { safeReturnPath } from '../lib/redirect.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 
@@ -14,6 +15,8 @@ export default function AuthPage() {
     clearPasswordRecovery,
   } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const destination = safeReturnPath(searchParams.get('next'));
   const [mode, setMode] = useState('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -45,7 +48,7 @@ export default function AuthPage() {
     );
   }
 
-  if (user) return <Navigate to="/dashboard" replace />;
+  if (user) return <Navigate to={destination} replace />;
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -76,7 +79,7 @@ export default function AuthPage() {
         return;
       }
 
-      navigate('/dashboard');
+      navigate(destination, { replace: true });
     } catch (err) {
       setError(err.message || 'Authentication failed. Please try again.');
     } finally {
@@ -155,7 +158,13 @@ export default function AuthPage() {
             </p>
           )}
           <button type="submit" className="button button-primary" disabled={submitting || mismatch}>
-            {mode === 'signin' ? 'Sign in' : mode === 'signup' ? 'Sign up' : 'Send reset link'}
+            {submitting
+              ? 'Please wait...'
+              : mode === 'signin'
+                ? 'Sign in'
+                : mode === 'signup'
+                  ? 'Sign up'
+                  : 'Send reset link'}
           </button>
         </form>
         <div className="stack auth-links">

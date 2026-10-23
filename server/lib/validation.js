@@ -1,4 +1,5 @@
 import { isValidCondition, METRICS_BY_DOMAIN } from './domains/allowlist.js';
+import { isPushEndpoint } from '../../supabase/functions/_shared/push.js';
 
 export class PublicError extends Error {
   constructor(message, status = 400) {
@@ -40,15 +41,17 @@ export function validateTrigger(body) {
   if (!Object.hasOwn(METRICS_BY_DOMAIN, domain)) {
     throw new PublicError('Unsupported domain.');
   }
-  const subject = object(body.subject, 'subject');
-  if (domain === 'weather') text(subject.location, 'location', 100);
+  const inputSubject = object(body.subject, 'subject');
+  const subject = {};
+  if (domain === 'weather') subject.location = text(inputSubject.location, 'location', 100);
   if (domain === 'sports') {
-    text(subject.team, 'team', 100);
-    if (subject.opponent != null && subject.opponent !== '') {
-      text(subject.opponent, 'opponent', 100);
+    subject.team = text(inputSubject.team, 'team', 100);
+    if (inputSubject.opponent != null && inputSubject.opponent !== '') {
+      subject.opponent = text(inputSubject.opponent, 'opponent', 100);
     }
   }
-  if (domain === 'crypto') text(subject.coin_id, 'coin_id', 100);
+  if (domain === 'crypto')
+    subject.coin_id = text(inputSubject.coin_id, 'coin_id', 100).toLowerCase();
   if (!isValidCondition(domain, body.condition)) {
     throw new PublicError('Invalid condition for this domain.');
   }
@@ -71,17 +74,26 @@ export function validateTrigger(body) {
 
 export function validatePushSubscription(value) {
   const subscription = object(value, 'subscription');
-  const endpoint = text(subscription.endpoint, 'endpoint', 2048);
-  if (!endpoint.startsWith('https://')) throw new PublicError('endpoint must use HTTPS.');
+  const endpoint = validatePushEndpoint(subscription.endpoint);
   const keys = object(subscription.keys, 'keys');
+  const p256dh = text(keys.p256dh, 'p256dh', 100);
+  const auth = text(keys.auth, 'auth', 30);
+  if (
+    !/^[A-Za-z0-9_-]+={0,2}$/.test(p256dh) ||
+    !/^[A-Za-z0-9_-]+={0,2}$/.test(auth) ||
+    Buffer.from(p256dh, 'base64url').length !== 65 ||
+    Buffer.from(p256dh, 'base64url')[0] !== 4 ||
+    Buffer.from(auth, 'base64url').length !== 16
+  )
+    throw new PublicError('Invalid push encryption keys.');
   return {
     endpoint,
-    keys: { p256dh: text(keys.p256dh, 'p256dh', 512), auth: text(keys.auth, 'auth', 512) },
+    keys: { p256dh, auth },
   };
 }
 
 export function validatePushEndpoint(value) {
   const endpoint = text(value, 'endpoint', 2048);
-  if (!endpoint.startsWith('https://')) throw new PublicError('endpoint must use HTTPS.');
+  if (!isPushEndpoint(endpoint)) throw new PublicError('Use a supported browser push endpoint.');
   return endpoint;
 }

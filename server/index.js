@@ -7,7 +7,7 @@ import cors from 'cors';
 import { requireAuth } from './lib/auth.js';
 import triggerRoutes from './routes/triggers.js';
 import pushRoutes from './routes/push.js';
-import { databaseReady } from './lib/readiness.js';
+import { databaseReady, schedulerReady } from './lib/readiness.js';
 import { supabase } from './lib/db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -17,14 +17,20 @@ app.disable('x-powered-by');
 app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
 app.use(express.json({ limit: '16kb' }));
 app.get('/api/health', (_req, res) => {
-  res.set('Cache-Control', 'no-store').json({ ok: true });
+  res
+    .set('Cache-Control', 'no-store')
+    .json({ ok: true, commit: process.env.RENDER_GIT_COMMIT || null });
 });
 app.get('/api/ready', async (_req, res) => {
-  const ready = await databaseReady(supabase);
+  const [database, scheduler] = await Promise.all([
+    databaseReady(supabase),
+    schedulerReady(supabase),
+  ]);
+  const ready = database && scheduler;
   res
     .set('Cache-Control', 'no-store')
     .status(ready ? 200 : 503)
-    .json({ ok: ready });
+    .json({ ok: ready, database, scheduler });
 });
 
 app.use('/api/triggers', requireAuth, triggerRoutes);

@@ -18,6 +18,14 @@ export default function TriggerCard({ trigger }) {
         {health?.delayed && <span className="warn-text">⚠ {health.label}</span>}
       </div>
       <p className="trigger-prompt">{summarizeTrigger(trigger)}</p>
+      {trigger.domain === 'unsupported' ? (
+        <p className="trigger-request">{trigger.unsupported_reason}</p>
+      ) : (
+        <>
+          <p className="trigger-request">{trigger.raw_prompt}</p>
+          <span className="muted">{trigger.recurring ? 'Recurring' : 'One-time'}</span>
+        </>
+      )}
       <span className="trigger-date">
         {trigger.last_checked_at
           ? `Last checked ${new Date(trigger.last_checked_at).toLocaleString()}`

@@ -6,14 +6,15 @@ Trigger turns a plain-English request into an editable alert. A scheduled check 
 
 ## Features
 
-- Create, edit, pause, resume, and delete alerts from natural-language requests.
+- Create alerts from plain English or a manual condition; edit the preview, pause, resume, and delete.
+- Start from examples, reuse requests, and search or filter your dashboard.
 - Monitor supported data:
   - Weather via Open-Meteo: temperature, precipitation, wind, and snowfall.
   - Live sports via TheSportsDB: team score, opponent score, and score difference.
   - Crypto via CoinGecko: USD coin price.
 - Choose one-time or recurring alerts, with level or false-to-true edge conditions.
 - Review check status and alert history; save unsupported requests without monitoring them.
-- Install the web app and enable push notifications per device.
+- Install the web app and enable push per device; signing out disconnects that device.
 
 ## Architecture
 
@@ -25,7 +26,7 @@ Trigger turns a plain-English request into an editable alert. A scheduled check 
 
 ## Setup
 
-1. Install Node.js 22.12 or newer and the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started). Create a Supabase project and run [`supabase/schema.sql`](supabase/schema.sql) in its SQL Editor.
+1. Install Node.js 22.12 or newer and the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started). Create a Supabase project and run [`supabase/schema.sql`](supabase/schema.sql) in its SQL Editor, followed by the SQL files in [`supabase/migrations`](supabase/migrations) in filename order. Apply new migrations before updating the Edge Function.
 2. Install dependencies, then copy [`.env.example`](.env.example) to `.env`.
 
    ```bash

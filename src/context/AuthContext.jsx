@@ -25,6 +25,7 @@ export function AuthProvider({ children }) {
     const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
       if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true);
+      if (event === 'SIGNED_OUT') setPasswordRecovery(false);
     });
 
     return () => {
@@ -41,7 +42,7 @@ export function AuthProvider({ children }) {
     clearPasswordRecovery: () => setPasswordRecovery(false),
     signUp: (email, password) => supabase.auth.signUp({ email, password }),
     signIn: (email, password) => supabase.auth.signInWithPassword({ email, password }),
-    signOut: () => supabase.auth.signOut(),
+    signOut: () => supabase.auth.signOut({ scope: 'local' }),
     resetPassword: (email) =>
       supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/auth' }),
     updatePassword: (password) => supabase.auth.updateUser({ password }),

@@ -1,9 +1,10 @@
 // Deno Edge Function. Invoked on a schedule by pg_cron + pg_net (see supabase/schema.sql).
 // Evaluates every active trigger and fires push notifications for the ones whose condition is met.
 
-import { createClient } from 'npm:@supabase/supabase-js@2';
+import { createClient } from 'npm:@supabase/supabase-js@2.118.0';
 import webpush from 'npm:web-push@3.6.7';
 import { decideFiring, pickLiveEvent } from '../_shared/evaluation.js';
+import { isPushEndpoint, PUSH_OPTIONS } from '../_shared/push.js';
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
@@ -138,39 +139,31 @@ async function evaluateTrigger(trigger: any) {
     else if (domain === 'crypto') result = await evaluateCrypto(subject, condition);
     else return;
   } catch (error) {
-    let update = supabase
-      .from('triggers')
-      .update({
-        last_checked_at: new Date().toISOString(),
-        last_state: { ...(trigger.last_state || {}), error: String(error) },
-      })
-      .eq('id', trigger.id)
-      .eq('status', 'active');
-    update = trigger.last_checked_at
-      ? update.eq('last_checked_at', trigger.last_checked_at)
-      : update.is('last_checked_at', null);
-    checked(await update);
+    checked(
+      await supabase.rpc('record_trigger_check', {
+        p_trigger_id: trigger.id,
+        p_last_checked_at: trigger.last_checked_at,
+        p_state: {
+          ...(trigger.last_state || {}),
+          error: 'Data provider unavailable. The next check will retry.',
+        },
+      }),
+    );
     throw error;
   }
 
-  const checkedAt = new Date().toISOString();
   if (result.value === null || result.value === undefined) {
-    let update = supabase
-      .from('triggers')
-      .update({
-        last_checked_at: checkedAt,
-        last_state: {
+    checked(
+      await supabase.rpc('record_trigger_check', {
+        p_trigger_id: trigger.id,
+        p_last_checked_at: trigger.last_checked_at,
+        p_state: {
           condition_met: trigger.last_state?.condition_met ?? null,
           event_id: trigger.last_state?.event_id ?? null,
           note: result.description,
         },
-      })
-      .eq('id', trigger.id)
-      .eq('status', 'active');
-    update = trigger.last_checked_at
-      ? update.eq('last_checked_at', trigger.last_checked_at)
-      : update.is('last_checked_at', null);
-    checked(await update);
+      }),
+    );
     return;
   }
   if (!Number.isFinite(result.value)) throw new Error('Provider returned an invalid value.');
@@ -181,70 +174,76 @@ async function evaluateTrigger(trigger: any) {
     result.value,
     result.eventId || null,
   );
-  let claim = supabase
-    .from('triggers')
-    .update({
-      last_checked_at: checkedAt,
-      last_state: state,
-      status: shouldFire && !trigger.recurring ? 'fired' : 'active',
-    })
-    .eq('id', trigger.id)
-    .eq('status', 'active');
-  claim = trigger.last_checked_at
-    ? claim.eq('last_checked_at', trigger.last_checked_at)
-    : claim.is('last_checked_at', null);
-  const claimed = checked(await claim.select('id'));
-  if (!claimed.length || !shouldFire) return;
-
-  const subs = checked(
-    await supabase.from('push_subscriptions').select('*').eq('user_id', trigger.user_id),
-  );
   const payload = {
     title: 'Trigger fired',
     body: `${trigger.raw_prompt} - ${result.description}`,
     url: `/triggers/${trigger.id}`,
     tag: `trigger-${trigger.id}`,
   };
-  const pushResults = await Promise.allSettled(
-    subs.map((sub: any) =>
-      webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, JSON.stringify(payload)),
-    ),
+  const eventId = checked(
+    await supabase.rpc('record_trigger_check', {
+      p_trigger_id: trigger.id,
+      p_last_checked_at: trigger.last_checked_at,
+      p_state: state,
+      p_payload: shouldFire ? payload : null,
+    }),
   );
-  const deadEndpoints = subs
-    .filter((_: any, index: number) => {
-      const outcome = pushResults[index];
-      return outcome.status === 'rejected' && [404, 410].includes(outcome.reason?.statusCode);
-    })
-    .map((sub: any) => sub.endpoint);
-  if (deadEndpoints.length) {
+  if (!eventId) return;
+
+  try {
+    const subs = checked(
+      await supabase.from('push_subscriptions').select('*').eq('user_id', trigger.user_id),
+    );
+    const pushResults = await Promise.allSettled(
+      subs.map(async (sub: any) => {
+        if (!isPushEndpoint(sub.endpoint)) throw new Error('Unsupported push endpoint.');
+        return webpush.sendNotification(
+          { endpoint: sub.endpoint, keys: sub.keys },
+          JSON.stringify(payload),
+          PUSH_OPTIONS,
+        );
+      }),
+    );
+    const delivered = pushResults.filter((outcome: any) => outcome.status === 'fulfilled').length;
+    const failed = pushResults.length - delivered;
     checked(
       await supabase
+        .from('trigger_events')
+        .update({
+          channels_sent: delivered ? ['push'] : [],
+          error: !subs.length
+            ? 'No push subscription'
+            : failed
+              ? `${failed} push delivery failed`
+              : null,
+        })
+        .eq('id', eventId),
+    );
+
+    const deadEndpoints = subs
+      .filter((_: any, index: number) => {
+        const outcome = pushResults[index];
+        return outcome.status === 'rejected' && [404, 410].includes(outcome.reason?.statusCode);
+      })
+      .map((sub: any) => sub.endpoint);
+    if (deadEndpoints.length) {
+      const { error } = await supabase
         .from('push_subscriptions')
         .delete()
         .eq('user_id', trigger.user_id)
-        .in('endpoint', deadEndpoints),
-    );
+        .in('endpoint', deadEndpoints);
+      if (error) console.error('Expired subscription cleanup failed:', error);
+    }
+  } catch (error) {
+    console.error('Push delivery interrupted for event:', eventId, error);
+    throw error;
   }
-  const delivered = pushResults.filter((outcome: any) => outcome.status === 'fulfilled').length;
-  const failed = pushResults.length - delivered;
-  checked(
-    await supabase.from('trigger_events').insert({
-      trigger_id: trigger.id,
-      payload,
-      channels_sent: delivered ? ['push'] : [],
-      error: !subs.length
-        ? 'No push subscription'
-        : failed
-          ? `${failed} push delivery failed`
-          : null,
-    }),
-  );
 }
 
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
   const secret = req.headers.get('x-cron-secret');
-  if (secret !== Deno.env.get('CRON_SHARED_SECRET')) {
+  if (!secret || secret !== Deno.env.get('CRON_SHARED_SECRET')) {
     return new Response('Unauthorized', { status: 401 });
   }
 
@@ -272,6 +271,15 @@ Deno.serve(async (req) => {
     }
     if (triggers.length < 100) break;
   }
+
+  const { error: heartbeatError } = await supabase.from('evaluator_status').upsert({
+    id: true,
+    completed_at: new Date().toISOString(),
+    evaluated,
+    failed,
+    version: '20261022',
+  });
+  if (heartbeatError) return new Response('Could not record evaluator status.', { status: 500 });
 
   return new Response(JSON.stringify({ evaluated, failed }), {
     headers: { 'Content-Type': 'application/json' },

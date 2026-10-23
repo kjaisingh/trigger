@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
 import Navbar from './components/Navbar.jsx';
 import LandingPage from './pages/LandingPage.jsx';
@@ -11,6 +11,7 @@ import NotFound from './pages/NotFound.jsx';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) {
     return (
       <p className="empty-state" role="status">
@@ -18,15 +19,25 @@ function ProtectedRoute({ children }) {
       </p>
     );
   }
-  if (!user) return <Navigate to="/auth" replace />;
+  if (!user)
+    return (
+      <Navigate
+        to={`/auth?next=${encodeURIComponent(location.pathname + location.search + location.hash)}`}
+        replace
+      />
+    );
   return children;
 }
 
 export default function App() {
+  const location = useLocation();
   return (
     <>
+      <a className="skip-link" href="#main-content">
+        Skip to content
+      </a>
       <Navbar />
-      <main className="page">
+      <main id="main-content" className="page" tabIndex={-1}>
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/auth" element={<AuthPage />} />
@@ -50,7 +61,7 @@ export default function App() {
             path="/triggers/:id"
             element={
               <ProtectedRoute>
-                <TriggerDetail />
+                <TriggerDetail key={location.pathname} />
               </ProtectedRoute>
             }
           />

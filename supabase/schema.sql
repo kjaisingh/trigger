@@ -1,4 +1,4 @@
--- Trigger schema. Run this once in the Supabase SQL editor for a fresh project.
+-- Fresh project: run this schema, then migrations/*.sql in filename order before deploying the evaluator.
 
 create extension if not exists pgcrypto;
 create extension if not exists pg_cron;

@@ -4,11 +4,11 @@ This describes the current app. Setup and deployment steps are in [`README.md`](
 
 ## Trigger lifecycle
 
-1. An authenticated user submits `raw_prompt` (1–500 characters) to `POST /api/triggers/parse`. Groq returns a supported domain with subject and condition, or `unsupported` with a reason. The user may edit the preview. Parsing is limited to ten requests per user per minute.
+1. An authenticated user submits `raw_prompt` (1–500 characters) to `POST /api/triggers/parse`. Groq returns a supported domain with subject and condition, or `unsupported` with a reason. The user may edit the preview or set a condition manually without parsing. Parsing is limited to ten requests per user per minute.
 2. `POST /api/triggers` validates the selected domain, its subject, a finite numeric threshold, comparison operator, edge flag, `recurring` boolean, and the only supported channel (`push`). It resolves a weather location, sports team, or CoinGecko coin once and stores the resolved identity. An unsupported trigger is saved with status `unsupported` and never evaluated.
 3. A Supabase cron job calls `evaluate-triggers` every 15 minutes. The function reads active triggers in pages, evaluates up to eight at a time, fetches the corresponding data, and records `last_checked_at` and `last_state`. Provider failures are stored as a check error; the next successful check clears it. The UI flags an active trigger if its first or latest check is more than 30 minutes old.
-4. When a condition fires, the function claims the observed state before sending push. This prevents overlapping cron invocations from sending the same observation twice. A one-time trigger changes to `fired`; a recurring trigger stays `active`. A history event records the condition and which channel actually delivered. Dead push subscriptions are removed.
-5. Users may pause, resume, or delete their own triggers. A paused trigger is not evaluated. The detail API shows the latest 100 history events; older events remain stored.
+4. When a condition fires, a service-role-only database function atomically claims the observed state and creates a history event before sending push. This prevents overlapping cron invocations from sending the same observation twice. A one-time trigger changes to `fired`; a recurring trigger stays `active`. Delivery updates that event with the accepted channel or failure. An interrupted delivery leaves a visible pending/interrupted event. Dead push subscriptions are removed.
+5. Users may pause/resume only active or paused triggers, or delete their own triggers. Fired and unsupported states cannot be reactivated. A paused trigger is not evaluated. The detail API shows the latest 100 history events; older events remain stored.
 
 ## Stored fields
 
@@ -31,6 +31,8 @@ A condition has `{ metric, operator, threshold, edge_trigger }`. Operators are `
 
 ## Boundaries
 
-The browser receives only the Supabase anon key and VAPID public key. The Express API verifies Supabase access tokens and scopes trigger and push operations to the user. The Edge Function uses the Supabase service role key and checks the cron secret. User input is bounded and validated at the API; upstream requests time out and retry transient failures. The public API returns generic server errors, while the server logs the underlying error.
+The browser receives only the Supabase anon key and VAPID public key. The Express API verifies Supabase access tokens and scopes trigger and push operations to the user. The Edge Function uses the Supabase service role key and checks the cron secret. Push destinations are restricted to browser push providers, keys are validated, and delivery attempts time out after ten seconds. User input is bounded and validated at the API; upstream requests time out and retry transient failures. The public API returns generic server errors, while the server logs the underlying error.
 
-The Render service does not run polling. `/api/health` checks process liveness, while `/api/ready` makes a bounded Supabase query and returns 503 if the database is unavailable. Supabase Edge Function and cron deployment are separate from a Render build. The app does not provide email, SMS, custom polling intervals, generic webpage monitoring, or guaranteed Free-tier database uptime.
+The Render service does not run polling. `/api/health` reports process liveness and the Render commit. `/api/ready` checks the database and requires an evaluator completion within 30 minutes; stale checks return 503. The evaluator stores completion counts in the service-role-only `evaluator_status` table. Supabase Edge Function and cron deployment are separate from a Render build. The app does not provide email, SMS, custom polling intervals, generic webpage monitoring, or guaranteed Free-tier database uptime.
+
+Sign-in preserves internal deep links. Settings only registers a device when the user enables notifications; signing out attempts both server removal and browser unsubscription.

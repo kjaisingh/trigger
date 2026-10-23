@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { databaseReady } from '../server/lib/readiness.js';
+import { databaseReady, schedulerReady } from '../server/lib/readiness.js';
 
 function client(result) {
   return {
@@ -28,6 +28,27 @@ function client(result) {
 
 test('database readiness accepts a successful bounded query', async () => {
   assert.equal(await databaseReady(client(Promise.resolve({ error: null }))), true);
+});
+
+test('scheduler readiness requires a recent completed invocation', async () => {
+  const now = Date.now();
+  const status = (data, error = null) => ({
+    from: () => ({
+      select: () => ({
+        eq: () => ({ maybeSingle: () => ({ abortSignal: async () => ({ data, error }) }) }),
+      }),
+    }),
+  });
+  assert.equal(
+    await schedulerReady(status({ completed_at: new Date(now - 60_000).toISOString() }), now),
+    true,
+  );
+  assert.equal(
+    await schedulerReady(status({ completed_at: new Date(now - 31 * 60_000).toISOString() }), now),
+    false,
+  );
+  assert.equal(await schedulerReady(status(null), now), false);
+  assert.equal(await schedulerReady(status(null, { message: 'offline' }), now), false);
 });
 
 test('database readiness rejects a database error or network failure', async () => {

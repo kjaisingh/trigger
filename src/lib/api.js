@@ -9,6 +9,7 @@ async function request(path, options = {}) {
 
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
+    signal: options.signal || AbortSignal.timeout(90_000),
     headers: {
       'Content-Type': 'application/json',
       ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),

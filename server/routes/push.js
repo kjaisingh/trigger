@@ -5,6 +5,23 @@ import { validatePushEndpoint, validatePushSubscription } from '../lib/validatio
 
 const router = Router();
 
+router.post('/status', async (req, res, next) => {
+  try {
+    const endpoint = validatePushEndpoint(req.body?.endpoint);
+    const existing = unwrap(
+      await supabase
+        .from('push_subscriptions')
+        .select('id')
+        .eq('user_id', req.user.id)
+        .eq('endpoint', endpoint)
+        .maybeSingle(),
+    );
+    res.json({ enabled: Boolean(existing) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post('/subscribe', async (req, res, next) => {
   try {
     const subscription = validatePushSubscription(req.body?.subscription);
@@ -101,9 +118,11 @@ router.post('/test', async (req, res, next) => {
 
     const delivered = results.filter((r) => r.status === 'fulfilled').length;
     if (!delivered) {
-      return res
-        .status(400)
-        .json({ message: 'Push subscription is no longer valid. Enable notifications again.' });
+      return res.status(deadEndpoints.length ? 410 : 502).json({
+        message: deadEndpoints.length
+          ? 'Push subscription expired. Disable notifications, then enable them again.'
+          : 'The push service is temporarily unavailable. Try again later.',
+      });
     }
 
     res.json({ ok: true });
